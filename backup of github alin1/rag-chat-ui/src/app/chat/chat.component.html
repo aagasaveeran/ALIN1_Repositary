@@ -1,0 +1,40 @@
+<div class="chat-wrapper">
+  <div class="header">
+    <h2>ALIN1 Tutor</h2>
+    <button class="clear-btn" (click)="clearChat()">Clear Session</button>
+  </div>
+
+  <div class="chat-history" #scrollContainer>
+    <div *ngFor="let msg of messages" [ngClass]="['message-row', msg.role]">
+      <div class="bubble">
+        <div class="sender-name">{{ msg.role === 'user' ? 'You' : 'ALIN1' }}</div>
+        
+        <div class="content">
+          <markdown [data]="msg.content"></markdown>
+        </div>
+
+        <div *ngIf="msg.sources && msg.sources.length > 0" class="sources-section">
+          <span class="source-label">Sources Used:</span>
+          <div class="source-pills">
+            <span *ngFor="let source of msg.sources" class="badge">
+              📖 {{ source }}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div *ngIf="isStreaming" class="streaming-indicator">ALIN1 is thinking...</div>
+  </div>
+
+  <div class="input-container">
+    <input 
+      [(ngModel)]="userInput" 
+      (keyup.enter)="sendMessage()" 
+      placeholder="Type your question..." 
+      [disabled]="isStreaming"
+    />
+    <button (click)="sendMessage()" [disabled]="isStreaming || !userInput.trim()">
+      Send
+    </button>
+  </div>
+</div>
