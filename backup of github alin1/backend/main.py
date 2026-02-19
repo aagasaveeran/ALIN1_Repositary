@@ -479,6 +479,107 @@
 
 
 
+# from fastapi import FastAPI, Query
+# from fastapi.middleware.cors import CORSMiddleware
+# from sse_starlette.sse import EventSourceResponse
+# import json
+# import ollama
+# import uvicorn
+
+# # Import logic from rag_core
+# from rag_core import (
+#     build_rag_context,
+#     add_memory,
+#     get_books_for_api,
+#     clear_chat_history,
+#     MODEL_NAME
+# )
+
+# app = FastAPI(title="ALIN1 AI Tutor System")
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# @app.get("/books")
+# def get_books():
+#     return get_books_for_api()
+
+# @app.get("/chat/stream")
+# async def stream_chat(message: str = Query(...)):
+#     async def event_generator():
+#         try:
+#             # 1. Retrieve the context AND the raw source objects
+#             rag_context, sources = build_rag_context(message)
+            
+#             # 2. Send the sources to the UI
+#             if sources:
+#                 source_ids = [str(s['id']) for s in sources]
+#                 yield json.dumps({"sources": source_ids})
+            
+#             # 3. SELECT PROMPT BASED ON DATA AVAILABILITY
+#             # Logic: If 'sources' list has items, we have real data.
+#             if sources and rag_context:
+#                 system_prompt = f"""You are ALIN1, a strict academic tutor for 'Indian Culture and Universal Values'.
+
+#                 CRITICAL INSTRUCTION:
+#                 Answer the question using ONLY the context provided below.
+                
+#                 RULES:
+#                 1. Use bullet points and bold text for clarity.
+#                 2. If the answer is not in the text, explicitly state: "I am sorry, but that topic is not covered in the provided course material."
+#                 3. Cite sections (e.g., "According to Section 550...") when they are relevant.
+
+#                 RAG CONTEXT:
+#                 {rag_context}
+
+#                 User Question: "{message}"
+#                 """
+#             else:
+#                 system_prompt = """You are ALIN1. 
+#                 Reply with exactly: "I'm sorry, I couldn't find any information about that in the course material. Could you try rephrasing your question?"
+#                 """
+
+#             messages = [
+#                 {"role": "system", "content": system_prompt},
+#                 {"role": "user", "content": message}
+#             ]
+            
+#             full_response = ""
+#             stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
+            
+#             for chunk in stream:
+#                 if 'message' in chunk and 'content' in chunk['message']:
+#                     token = chunk['message']['content']
+#                     if token:
+#                         full_response += token
+#                         yield json.dumps({"token": token})
+            
+#             add_memory(message, full_response)
+#             yield json.dumps({"done": True})
+            
+#         except Exception as e:
+#             yield json.dumps({"error": str(e)})
+
+#     return EventSourceResponse(event_generator())
+
+# @app.post("/clear")
+# async def clear_memory():
+#     result = clear_chat_history('YES')
+#     return {"status": result}
+
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+
+
+
+
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
@@ -490,9 +591,9 @@ import uvicorn
 from rag_core import (
     build_rag_context,
     add_memory,
-    get_books_for_api,
     clear_chat_history,
-    MODEL_NAME
+    MODEL_NAME,
+    DB_MAP  # Import the map so we can validate subjects
 )
 
 app = FastAPI(title="ALIN1 AI Tutor System")
@@ -505,43 +606,79 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# === 1. DYNAMIC SYSTEM PROMPTS ===
+# This dictionary changes the AI's personality based on the selected dropdown
+SUBJECT_PROMPTS = {
+    "rtl": """You are ALIN1, a wise guide for 'Indian Culture and Universal Values' (RTL).
+    Focus on holistic growth, integrity, and inner transformation.
+    Use metaphors from nature where appropriate.""",
+    
+    "python": """You are ALIN1, a Senior Python Developer and Instructor.
+    Focus on writing clean, efficient, and PEP-8 compliant code.
+    Always explain the logic behind your code snippets.""",
+    
+    "maths": """You are ALIN1, a Mathematics Professor.
+    Solve problems step-by-step. Show your working clearly.
+    If a formula is used, state it first.""",
+    
+    "english": """You are ALIN1, a Literature and Grammar Expert.
+    Focus on clarity, tone, and vocabulary.
+    Correct any grammatical errors you see in the user's input politely."""
+}
+
 @app.get("/books")
 def get_books():
-    return get_books_for_api()
+    """Returns the list of available subjects for the dropdown."""
+    # We return the keys of our DB_MAP (rtl, python, maths, etc.)
+    return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
 
 @app.get("/chat/stream")
-async def stream_chat(message: str = Query(...)):
+async def stream_chat(
+    message: str = Query(...), 
+    subject: str = Query("rtl") # <--- NEW PARAMETER (Defaults to RTL)
+):
+    # Validate the subject (security check)
+    if subject not in DB_MAP:
+        subject = "rtl"
+
     async def event_generator():
         try:
-            # 1. Retrieve the context AND the raw source objects
-            rag_context, sources = build_rag_context(message)
+            # 1. Retrieve Context for the SPECIFIC SUBJECT
+            rag_context, sources = build_rag_context(message, subject=subject)
             
-            # 2. Send the sources to the UI
+            # 2. Send sources to UI
             if sources:
                 source_ids = [str(s['id']) for s in sources]
                 yield json.dumps({"sources": source_ids})
             
-            # 3. SELECT PROMPT BASED ON DATA AVAILABILITY
-            # Logic: If 'sources' list has items, we have real data.
+            # 3. Select the correct Persona
+            base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
+            
+            # 4. Construct the Final Prompt
+           # ... (previous code) ...
             if sources and rag_context:
-                system_prompt = f"""You are ALIN1, a strict academic tutor for 'Indian Culture and Universal Values'.
+                system_prompt = f"""{base_persona}
 
                 CRITICAL INSTRUCTION:
-                Answer the question using ONLY the context provided below.
+                Answer using ONLY the context provided below.
                 
                 RULES:
-                1. Use bullet points and bold text for clarity.
-                2. If the answer is not in the text, explicitly state: "I am sorry, but that topic is not covered in the provided course material."
-                3. Cite sections (e.g., "According to Section 550...") when they are relevant.
+                1. If the answer is found in the "{subject.upper()} TEXTBOOK", explain it clearly.
+                2. If the user asks something NOT in the text, say: "I am sorry, but that topic is not covered in the {subject.upper()} course material."
+                3. Cite sources (e.g., [Source: Section 550]) if available.
 
                 RAG CONTEXT:
                 {rag_context}
-
+                
                 User Question: "{message}"
                 """
             else:
-                system_prompt = """You are ALIN1. 
-                Reply with exactly: "I'm sorry, I couldn't find any information about that in the course material. Could you try rephrasing your question?"
+                # STRICT FALLBACK: Remove the base persona entirely so it doesn't hallucinate metaphors
+                system_prompt = f"""You are a strict system assistant. 
+                The user asked a question, but NO information was found in the {subject.upper()} database.
+                You MUST reply with EXACTLY this sentence and nothing else: 
+                "I'm sorry, I couldn't find any information about that in the {subject.upper()} course material."
+                DO NOT add any metaphors, greetings, or explanations.
                 """
 
             messages = [

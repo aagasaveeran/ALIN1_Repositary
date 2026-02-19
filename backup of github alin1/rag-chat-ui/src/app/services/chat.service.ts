@@ -26,9 +26,11 @@ export class ChatService {
     return this.http.get<any[]>(`${this.apiUrl}/books`);
   }
 
-  streamChat(message: string): Observable<StreamResponse> {
+  // CHANGED: Added 'subject: string' here
+  streamChat(message: string, subject: string): Observable<StreamResponse> {
     return new Observable(observer => {
-      const url = `${this.apiUrl}/chat/stream?message=${encodeURIComponent(message)}`;
+      // CHANGED: Added '&subject=' to the URL string
+      const url = `${this.apiUrl}/chat/stream?message=${encodeURIComponent(message)}&subject=${encodeURIComponent(subject)}`;
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {

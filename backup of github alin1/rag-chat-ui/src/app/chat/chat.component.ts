@@ -1,89 +1,69 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { MarkdownModule } from 'ngx-markdown';
-import { ChatService, ChatMessage, StreamResponse } from '../services/chat.service';
+import { Injectable, NgZone } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
-@Component({
-  selector: 'app-chat',
-  standalone: true,
-  imports: [CommonModule, FormsModule, MarkdownModule],
-  templateUrl: './chat.component.html',
-  styleUrls: ['./chat.component.css']
+export interface StreamResponse {
+  type: 'token' | 'sources' | 'error' | 'done';
+  value?: any;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  sources?: string[];
+  timestamp: Date;
+}
+
+@Injectable({
+  providedIn: 'root'
 })
-export class ChatComponent implements OnInit, AfterViewChecked {
-  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
+export class ChatService {
+  private apiUrl = 'http://localhost:8000';
 
-  messages: ChatMessage[] = [];
-  userInput = '';
-  isStreaming = false;
+  constructor(private http: HttpClient, private zone: NgZone) {}
 
-  constructor(
-    private chatService: ChatService,
-    private cd: ChangeDetectorRef
-  ) {}
+  // 1. We added 'subject: string' here so it expects the second argument
+  streamChat(message: string, subject: string): Observable<StreamResponse> {
+    return new Observable((observer) => {
+      
+      // 2. We added &subject= to the URL to tell Python which DB to use
+      const url = `${this.apiUrl}/chat/stream?message=${encodeURIComponent(message)}&subject=${encodeURIComponent(subject)}`;
+      const eventSource = new EventSource(url);
 
-  ngOnInit() {}
+      eventSource.onmessage = (event) => {
+        this.zone.run(() => {
+          const data = JSON.parse(event.data);
+          if (data.sources) {
+            observer.next({ type: 'sources', value: data.sources });
+          } else if (data.token) {
+            observer.next({ type: 'token', value: data.token });
+          } else if (data.done) {
+            observer.next({ type: 'done' });
+            observer.complete();
+            eventSource.close();
+          } else if (data.error) {
+            observer.next({ type: 'error', value: data.error });
+            observer.complete();
+            eventSource.close();
+          }
+        });
+      };
 
-  ngAfterViewChecked() {
-    this.scrollToBottom();
-  }
+      eventSource.onerror = (error) => {
+        this.zone.run(() => {
+          observer.next({ type: 'error', value: 'Connection lost or server error.' });
+          observer.complete();
+          eventSource.close();
+        });
+      };
 
-  scrollToBottom(): void {
-    try {
-      if (this.scrollContainer) {
-        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
-      }
-    } catch (err) {}
-  }
-
-  sendMessage() {
-    if (!this.userInput.trim() || this.isStreaming) return;
-
-    const userMsg: ChatMessage = {
-      role: 'user',
-      content: this.userInput,
-      timestamp: new Date()
-    };
-
-    this.messages.push(userMsg);
-    const messageToSend = this.userInput;
-    this.userInput = '';
-    this.isStreaming = true;
-
-    const assistantMsg: ChatMessage = {
-      role: 'assistant',
-      content: '',
-      sources: [],
-      timestamp: new Date()
-    };
-    this.messages.push(assistantMsg);
-
-    this.chatService.streamChat(messageToSend).subscribe({
-      next: (res: StreamResponse) => {
-        if (res.type === 'sources') {
-          assistantMsg.sources = res.value;
-        } else if (res.type === 'token') {
-          assistantMsg.content += res.value;
-        } else if (res.type === 'error') {
-          assistantMsg.content = `Error: ${res.value}`;
-        }
-        this.cd.detectChanges();
-      },
-      error: (err) => {
-        this.isStreaming = false;
-        this.cd.detectChanges();
-      },
-      complete: () => {
-        this.isStreaming = false;
-        this.cd.detectChanges();
-      }
+      return () => {
+        eventSource.close();
+      };
     });
   }
 
-  clearChat() {
-    this.chatService.clearMemory().subscribe(() => {
-      this.messages = [];
-    });
+  clearMemory(): Observable<any> {
+    return this.http.post(`${this.apiUrl}/clear`, {});
   }
 }
