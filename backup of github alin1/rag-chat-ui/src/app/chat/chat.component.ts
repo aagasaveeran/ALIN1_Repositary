@@ -1,6 +1,10 @@
+import { Component, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Injectable, NgZone } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { MarkdownModule } from 'ngx-markdown';
 
 export interface StreamResponse {
   type: 'token' | 'sources' | 'error' | 'done';
@@ -65,5 +69,75 @@ export class ChatService {
 
   clearMemory(): Observable<any> {
     return this.http.post(`${this.apiUrl}/clear`, {});
+  }
+}
+
+@Component({
+  selector: 'app-chat',
+  standalone: true,
+  imports: [CommonModule, FormsModule, MarkdownModule],
+  templateUrl: './chat.component.html',
+  styleUrl: './chat.component.css'
+})
+export class ChatComponent implements OnInit {
+  messages: ChatMessage[] = [];
+  userInput: string = '';
+  selectedSubject: string = 'rtl';
+  isLoading: boolean = false;
+  isStreaming: boolean = false;
+  subjects: string[] = ['general', 'english', 'maths', 'python', 'rtl'];
+
+  constructor(private chatService: ChatService) {}
+
+  ngOnInit(): void {}
+
+  sendMessage(): void {
+    if (!this.userInput.trim() || this.isStreaming) {
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      role: 'user',
+      content: this.userInput,
+      timestamp: new Date()
+    };
+
+    this.messages.push(userMessage);
+    const message = this.userInput;
+    this.userInput = '';
+    this.isStreaming = true;
+
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      sources: [],
+      timestamp: new Date()
+    };
+
+    this.messages.push(assistantMessage);
+
+    this.chatService.streamChat(message, this.selectedSubject).subscribe({
+      next: (response: StreamResponse) => {
+        if (response.type === 'token' && assistantMessage.content !== undefined) {
+          assistantMessage.content += response.value;
+        } else if (response.type === 'sources') {
+          assistantMessage.sources = response.value;
+        } else if (response.type === 'done') {
+          this.isStreaming = false;
+        } else if (response.type === 'error') {
+          assistantMessage.content = `Error: ${response.value}`;
+          this.isStreaming = false;
+        }
+      },
+      error: () => {
+        assistantMessage.content = 'Error: Failed to get response from server.';
+        this.isStreaming = false;
+      }
+    });
+  }
+
+  clearChat(): void {
+    this.messages = [];
+    this.chatService.clearMemory().subscribe();
   }
 }

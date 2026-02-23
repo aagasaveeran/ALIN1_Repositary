@@ -1,0 +1,79 @@
+Chapter 2: Control Flow – Making Decisions
+Welcome to Decision Making! In the previous chapter, we learned how to store data. Now, we will learn how to make our programs "think." Just like you decide whether to take an umbrella based on whether it is raining, Python uses Control Statements to decide which code to run.
+2.1 Understanding Booleans (True or False)
+Before we write complex logic, we need to understand the concept of a Boolean. A Boolean is a value that can only be one of two things:
+• True (Yes/Correct)
+• False (No/Incorrect)
+Think of it like a light switch—it is either ON or OFF. We often get these values when we compare things.
+Real-world Analogy: The instructor uses a cricket analogy: "If RCB (Royal Challengers Bangalore) wins, say 'Win'."
+• If RCB == "Win", the result is True.
+• If RCB != "Win", the result is False.
+2.2 The if and else Statements
+The if statement tells Python: "If this condition is true, do this task." The else statement adds: "Otherwise, do this alternative task."
+Example: Pass or Fail? Let's build a program to check a student's mark. If the mark is greater than 35, they pass. Otherwise, they fail.
+Code Example:
+mark = int(input()) # Get the mark from the user
+
+if mark > 35:
+    print("Pass")
+else:
+    print("Fail")
+• How it works: If you enter 40, Python asks: "Is 40 > 35?" The answer is True, so it prints "Pass". If you enter 30, the answer is False, so it skips to else and prints "Fail".
+Important Note on Indentation: Notice the space before print("Pass"). In Python, this spacing (indentation) is crucial. It tells Python that the print statement belongs inside the if block.
+2.3 Checking Multiple Conditions (elif)
+Sometimes, life isn't just "Yes" or "No." You might have multiple options. For this, we use elif (short for "else if").
+Example: The Mini-Calculator Let's create a program where the user enters two numbers (a and b) and chooses an operation (add, subtract, multiply, or divide).
+Code Example:
+a = int(input("Enter A: "))
+b = int(input("Enter B: "))
+operation = input("add/sub/mul/div: ")
+
+if operation == "add":
+    print(a + b)
+elif operation == "sub":
+    print(a - b)
+elif operation == "mul":
+    print(a * b)
+elif operation == "div":
+    print(a / b)
+else:
+    print("Invalid Operation")
+• Explanation: Python checks the conditions one by one. If the user types "mul", Python skips "add" and "sub", finds the match at elif operation == "mul", executes the math, and ignores the rest.
+2.4 Logical Operators (and, or)
+What if we need to check two things at once?
+The and Operator
+The and operator requires both conditions to be True.
+Example: Divisibility Test Let's check if a number is divisible by both 3 and 5.
+number = int(input())
+
+if number % 3 == 0 and number % 5 == 0:
+    print("Divisible by 3 and 5")
+else:
+    print("Not divisible by 3 and 5")
+• If input is 15: 15 is divisible by 3 (True) AND 15 is divisible by 5 (True). Result: Prints the message.
+• If input is 9: 9 is divisible by 3 (True) AND 9 is divisible by 5 (False). Since one is False, the whole result is False.
+The or Operator
+The or operator requires only one of the conditions to be True.
+Example: Loan Eligibility Imagine a bank rule: You get a loan if your salary is at least 20,000 OR if you are 25 years old or younger.
+Code Example:
+salary = int(input("Enter Salary: "))
+age = int(input("Enter Age: "))
+
+if salary >= 20000 or age <= 25:
+    print("You are eligible for loan")
+else:
+    print("You are not eligible")
+• Scenario 1: Salary 30,000 (True), Age 50 (False). Result: Eligible (because one was True).
+• Scenario 2: Salary 10,000 (False), Age 50 (False). Result: Not Eligible.
+2.5 Practice Exercise: Even or Odd?
+A classic interview question is checking if a number is even or odd using the modulus operator (%), which gives the remainder of a division.
+Code Example:
+number = int(input())
+
+if number % 2 == 0:
+    print("Even")
+else:
+    print("Odd")
+• Logic: Any even number divided by 2 has a remainder of 0 (e.g., 4/2 = 2 remainder 0). Any odd number has a remainder of 1.
+
+--------------------------------------------------------------------------------

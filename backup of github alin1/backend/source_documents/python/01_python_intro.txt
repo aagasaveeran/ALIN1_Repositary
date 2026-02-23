@@ -1,0 +1,56 @@
+--------------------------------------------------------------------------------
+Chapter 1: Python Basics – Variables, Strings, and User Input
+Welcome to Python! In this first chapter, we are going to lay the foundation for everything you will build in the future. We will learn how to store information (variables), how to handle text (strings), and most importantly, how to make your program interactive by getting information from the user.
+1.1 Understanding Variables
+Imagine a variable as a container where you can store data. In Python, creating a variable is incredibly simple—you just give it a name and assign a value to it.
+• Integers (Whole Numbers): If you want to store a number, you simply type the name of the variable, an equal sign, and the number.
+• Here, a holds the value 10, and b holds 20.
+• Strings (Text): If you want to store text (which programmers call a "string"), you must wrap that text inside double quotation marks (""). This tells Python that "EMC" is text, not a number or a command.
+• If you tried to write a = EMC without quotes, Python would get confused and think EMC is another variable name.
+1.2 Interacting with the User (Input and Output)
+A program becomes truly useful when it can talk to the user. We do this using input() to get data and print() to show data.
+The Basic Input Function: To ask the user for information, we use the input() command. Let's build a simple program that asks for a user's name and age, and then prints it back to them using a friendly format.
+Code Example:
+name = input() 
+age = input() 
+
+print("My name is:", name)
+print("My age is:", age)
+How it works:
+1. When the code runs, the cursor will blink, waiting for you to type something.
+2. If you type EMC for the name and 1 for the age:
+3. The output will look like this: My name is: EMC and My age is: 1.
+Adding More Details: We can expand this to include an address. Notice how we use the comma , inside the print statement to join our custom message ("My address is:") with the actual variable address.
+Code Example:
+input() # The prompt waits for the user to type their name
+print("My name is:", name) 
+
+input() # The prompt waits for the user to type their age
+print("My age is:", age)
+
+address = input() # The prompt waits for the user to type their address
+print("My address is:", address)
+Result: If the user types "EMC", "1", and "Chennai", the program prints them out neatly.
+1.3 Working with Numbers: The int() Function
+Here is a very important rule in Python: By default, the input() function treats everything as a string (text).
+If you want to do math—like adding or multiplying numbers—you have to tell Python explicitly that the input is a number. We do this by wrapping the input inside int(), which stands for "integer".
+Code Example: Adding and Multiplying Variables Let's create a program that takes three numbers from the user (a, b, and c) and performs math on them.
+# Getting integer input from the user
+a = int(input())
+b = int(input())
+c = int(input())
+
+# Multiplying all three variables
+d = a * b * c
+print(d)
+
+# Adding all three variables
+e = a + b + c
+print(e)
+
+# Dividing the added result by the multiplied result
+f = e / d
+print(f)
+Why this matters: If you didn't use int(), Python would just stick the numbers together like text (e.g., "10" + "20" becomes "1020") instead of adding them mathematically (10 + 20 = 30).
+
+--------------------------------------------------------------------------------

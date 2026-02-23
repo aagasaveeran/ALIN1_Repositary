@@ -118,25 +118,143 @@
 
 
 
-import os
-import sys
-import chromadb
-from pathlib import Path
+# import os
+# import sys
+# import chromadb
+# from pathlib import Path
 
-# Import the embedding function and our database map
+# # Import the embedding function and our database map
+# from rag_core import embed_text, DB_MAP
+
+# print("🚀 SCRIPT STARTED: Multi-Subject Ingestion Mode")
+
+# def smart_chunk_text(text, max_chars=1000):
+#     """Splits text into chunks that are safe for the embedding model."""
+#     raw_paragraphs = text.split('\n\n')
+#     safe_chunks = []
+    
+#     for para in raw_paragraphs:
+#         para = para.strip()
+#         if not para:
+#             continue
+            
+#         if len(para) < max_chars:
+#             safe_chunks.append(para)
+#         else:
+#             words = para.split(' ')
+#             current_chunk = ""
+#             for word in words:
+#                 if len(current_chunk) + len(word) + 1 < max_chars:
+#                     current_chunk += " " + word
+#                 else:
+#                     safe_chunks.append(current_chunk.strip())
+#                     current_chunk = word
+#             if current_chunk:
+#                 safe_chunks.append(current_chunk.strip())
+                
+#     return safe_chunks
+
+# def ingest_text_file(file_path, subject):
+#     print(f"📖 Target Subject: {subject.upper()}")
+#     print(f"📖 Reading: {file_path}")
+    
+#     # 1. Validate Subject against our DB_MAP
+#     if subject not in DB_MAP:
+#         print(f"❌ ERROR: Subject '{subject}' is not valid.")
+#         print(f"   Valid subjects are: {list(DB_MAP.keys())}")
+#         return
+        
+#     try:
+#         with open(file_path, 'r', encoding='utf-8') as f:
+#             text = f.read()
+#     except FileNotFoundError:
+#         print(f"❌ ERROR: Could not find file '{file_path}'")
+#         return
+
+#     # 2. Setup Client for this specific subject
+#     db_path = DB_MAP[subject]
+    
+#     # Ensure the parent folders exist
+#     db_path.mkdir(parents=True, exist_ok=True)
+    
+#     client = chromadb.PersistentClient(path=str(db_path))
+    
+#     # Reset the collection to start fresh for this subject
+#     try:
+#         client.delete_collection("book_content")
+#         print(f"   - Old '{subject}' database cleared.")
+#     except:
+#         pass
+
+#     collection = client.create_collection(
+#         name="book_content",
+#         metadata={"hnsw:space": "cosine"}
+#     )
+
+#     print("🔪 Slicing text into safe chunks...")
+#     chunks = smart_chunk_text(text)
+    
+#     if not chunks:
+#         print("❌ ERROR: File ended up empty after processing!")
+#         return
+
+#     print(f"🔍 Found {len(chunks)} safe chunks. Generating embeddings...")
+    
+#     total = len(chunks)
+#     batch_size = 10
+    
+#     for i in range(0, total, batch_size):
+#         batch = chunks[i : i + batch_size]
+        
+#         # We now attach the subject name as metadata so we can track it
+#         ids = [f"chunk_{i+j}" for j in range(len(batch))]
+#         metadatas = [{"chunk_id": f"Section {i+j}", "source": file_path, "subject": subject} for j in range(len(batch))]
+        
+#         try:
+#             embeddings = [embed_text(c, task_type="document") for c in batch]
+            
+#             collection.add(
+#                 ids=ids,
+#                 embeddings=embeddings,
+#                 documents=batch,
+#                 metadatas=metadatas
+#             )
+#             print(f"   - Processed {min(i + batch_size, total)}/{total} chunks...", end='\r')
+#         except Exception as e:
+#             print(f"\n❌ Error on batch starting at index {i}: {e}")
+#             continue
+            
+#     print(f"\n✅ SUCCESS: Ingestion complete for {subject.upper()}! Database is ready.")
+
+# if __name__ == "__main__":
+#     # === CHANGE THESE VARIABLES WHEN YOU UPLOAD NEW FILES ===
+#     TARGET_SUBJECT = "rtl"        # Options: "rtl", "python", "maths", "english"
+#     TARGET_FILE = r"C:\Users\kagas\Pictures\ALIN1_final_repository_local\ALIN1_Repositary\backup of github alin1\backend\rtl-Copy.txt"  # Your text file for that subject
+#     # ========================================================
+    
+#     ingest_text_file(TARGET_FILE, TARGET_SUBJECT)
+
+
+######### multi files ingest is below########
+
+import os
+from pathlib import Path
+import chromadb
+
+# Import our database map and embedding logic
 from rag_core import embed_text, DB_MAP
 
-print("🚀 SCRIPT STARTED: Multi-Subject Ingestion Mode")
+# Define where you will drop your raw text files
+SOURCE_DIR = Path("source_documents")
 
 def smart_chunk_text(text, max_chars=1000):
-    """Splits text into chunks that are safe for the embedding model."""
+    """Splits text into safe chunks for embedding."""
     raw_paragraphs = text.split('\n\n')
     safe_chunks = []
     
     for para in raw_paragraphs:
         para = para.strip()
-        if not para:
-            continue
+        if not para: continue
             
         if len(para) < max_chars:
             safe_chunks.append(para)
@@ -151,85 +269,72 @@ def smart_chunk_text(text, max_chars=1000):
                     current_chunk = word
             if current_chunk:
                 safe_chunks.append(current_chunk.strip())
-                
     return safe_chunks
 
-def ingest_text_file(file_path, subject):
-    print(f"📖 Target Subject: {subject.upper()}")
-    print(f"📖 Reading: {file_path}")
+def process_all_subjects():
+    print("🚀 SCRIPT STARTED: Batch Subject Ingestion\n")
     
-    # 1. Validate Subject against our DB_MAP
-    if subject not in DB_MAP:
-        print(f"❌ ERROR: Subject '{subject}' is not valid.")
-        print(f"   Valid subjects are: {list(DB_MAP.keys())}")
-        return
+    # Ensure the main source directory exists
+    SOURCE_DIR.mkdir(exist_ok=True)
+    
+    # Loop through every subject defined in our rag_core.py DB_MAP
+    for subject, db_path in DB_MAP.items():
+        # 1. Create a drop-folder for the subject if it doesn't exist
+        subject_folder = SOURCE_DIR / subject
+        subject_folder.mkdir(exist_ok=True)
         
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            text = f.read()
-    except FileNotFoundError:
-        print(f"❌ ERROR: Could not find file '{file_path}'")
-        return
-
-    # 2. Setup Client for this specific subject
-    db_path = DB_MAP[subject]
-    
-    # Ensure the parent folders exist
-    db_path.mkdir(parents=True, exist_ok=True)
-    
-    client = chromadb.PersistentClient(path=str(db_path))
-    
-    # Reset the collection to start fresh for this subject
-    try:
-        client.delete_collection("book_content")
-        print(f"   - Old '{subject}' database cleared.")
-    except:
-        pass
-
-    collection = client.create_collection(
-        name="book_content",
-        metadata={"hnsw:space": "cosine"}
-    )
-
-    print("🔪 Slicing text into safe chunks...")
-    chunks = smart_chunk_text(text)
-    
-    if not chunks:
-        print("❌ ERROR: File ended up empty after processing!")
-        return
-
-    print(f"🔍 Found {len(chunks)} safe chunks. Generating embeddings...")
-    
-    total = len(chunks)
-    batch_size = 10
-    
-    for i in range(0, total, batch_size):
-        batch = chunks[i : i + batch_size]
+        # 2. Find all .txt files in that folder
+        txt_files = list(subject_folder.glob("*.txt"))
         
-        # We now attach the subject name as metadata so we can track it
-        ids = [f"chunk_{i+j}" for j in range(len(batch))]
-        metadatas = [{"chunk_id": f"Section {i+j}", "source": file_path, "subject": subject} for j in range(len(batch))]
-        
-        try:
-            embeddings = [embed_text(c, task_type="document") for c in batch]
-            
-            collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                documents=batch,
-                metadatas=metadatas
-            )
-            print(f"   - Processed {min(i + batch_size, total)}/{total} chunks...", end='\r')
-        except Exception as e:
-            print(f"\n❌ Error on batch starting at index {i}: {e}")
+        if not txt_files:
+            print(f"⏭️  SKIPPING {subject.upper()}: No .txt files found in '{subject_folder}'")
             continue
             
-    print(f"\n✅ SUCCESS: Ingestion complete for {subject.upper()}! Database is ready.")
+        print(f"📚 PROCESSING SUBJECT: {subject.upper()}")
+        
+        # 3. Connect to the ChromaDB for this specific subject
+        db_path.mkdir(parents=True, exist_ok=True)
+        client = chromadb.PersistentClient(path=str(db_path))
+        
+        # Clear the old database so we don't duplicate data
+        try:
+            client.delete_collection("book_content")
+        except:
+            pass
+            
+        collection = client.create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+        
+        # 4. Process every file in the subject folder
+        total_chunks_for_subject = 0
+        
+        for file_path in txt_files:
+            print(f"   📄 Reading file: {file_path.name}")
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                text = f.read()
+                
+            chunks = smart_chunk_text(text)
+            if not chunks:
+                continue
+                
+            batch_size = 10
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i : i + batch_size]
+                
+                # Create unique IDs so files don't overwrite each other
+                ids = [f"{file_path.stem}_chunk_{total_chunks_for_subject+j}" for j in range(len(batch))]
+                metadatas = [{"chunk_id": f"Section {total_chunks_for_subject+j}", "source": file_path.name, "subject": subject} for j in range(len(batch))]
+                
+                try:
+                    embeddings = [embed_text(c, task_type="document") for c in batch]
+                    collection.add(ids=ids, embeddings=embeddings, documents=batch, metadatas=metadatas)
+                    total_chunks_for_subject += len(batch)
+                    print(f"      - Embedded {total_chunks_for_subject} chunks...", end='\r')
+                except Exception as e:
+                    print(f"\n❌ Error on batch: {e}")
+                    
+        print(f"\n   ✅ Finished {subject.upper()}! Added {total_chunks_for_subject} total chunks to the DB.\n")
 
 if __name__ == "__main__":
-    # === CHANGE THESE VARIABLES WHEN YOU UPLOAD NEW FILES ===
-    TARGET_SUBJECT = "rtl"        # Options: "rtl", "python", "maths", "english"
-    TARGET_FILE = r"C:\Users\kagas\Pictures\ALIN1_final_repository_local\ALIN1_Repositary\backup of github alin1\backend\rtl-Copy.txt"  # Your text file for that subject
-    # ========================================================
-    
-    ingest_text_file(TARGET_FILE, TARGET_SUBJECT)
+    process_all_subjects()
+
+
