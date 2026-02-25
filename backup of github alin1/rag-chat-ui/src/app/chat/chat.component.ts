@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core'; // <-- Added ChangeDetectorRef here
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Injectable, NgZone } from '@angular/core';
@@ -16,6 +16,8 @@ export interface ChatMessage {
   content: string;
   sources?: string[];
   timestamp: Date;
+  thinkTime?: number; // Time until the first word is typed
+  totalTime?: number; // Total time from start to finish
 }
 
 @Injectable({
@@ -26,11 +28,8 @@ export class ChatService {
 
   constructor(private http: HttpClient, private zone: NgZone) {}
 
-  // 1. We added 'subject: string' here so it expects the second argument
   streamChat(message: string, subject: string): Observable<StreamResponse> {
     return new Observable((observer) => {
-      
-      // 2. We added &subject= to the URL to tell Python which DB to use
       const url = `${this.apiUrl}/chat/stream?message=${encodeURIComponent(message)}&subject=${encodeURIComponent(subject)}`;
       const eventSource = new EventSource(url);
 
@@ -72,6 +71,8 @@ export class ChatService {
   }
 }
 
+// ... (keep your imports and interfaces exactly the same) ...
+
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -87,51 +88,79 @@ export class ChatComponent implements OnInit {
   isStreaming: boolean = false;
   subjects: string[] = ['general', 'english', 'maths', 'python', 'rtl'];
 
-  constructor(private chatService: ChatService) {}
+  timerInterval: any; // <-- ADD THIS to hold our stopwatch
+
+  constructor(private chatService: ChatService, private cd: ChangeDetectorRef) {}
 
   ngOnInit(): void {}
 
-  sendMessage(): void {
-    if (!this.userInput.trim() || this.isStreaming) {
-      return;
-    }
+  sendMessage() {
+    if (!this.userInput.trim() || this.isStreaming) return;
 
-    const userMessage: ChatMessage = {
+    // 1. Setup the User Message
+    const userMsg: ChatMessage = {
       role: 'user',
       content: this.userInput,
       timestamp: new Date()
     };
-
-    this.messages.push(userMessage);
-    const message = this.userInput;
+    this.messages.push(userMsg);
+    
+    const messageToSend = this.userInput;
     this.userInput = '';
     this.isStreaming = true;
 
-    const assistantMessage: ChatMessage = {
+    // 2. Instantly push the Assistant Bubble so it animates in immediately
+    const assistantMsg: ChatMessage = {
       role: 'assistant',
       content: '',
       sources: [],
-      timestamp: new Date()
+      timestamp: new Date(),
+      thinkTime: 0.0,
+      totalTime: 0.0
     };
+    this.messages.push(assistantMsg);
 
-    this.messages.push(assistantMessage);
+    // 3. START THE LIVE STOPWATCH
+    const startTime = Date.now();
+    let hasCalculatedTime = false; 
 
-    this.chatService.streamChat(message, this.selectedSubject).subscribe({
-      next: (response: StreamResponse) => {
-        if (response.type === 'token' && assistantMessage.content !== undefined) {
-          assistantMessage.content += response.value;
-        } else if (response.type === 'sources') {
-          assistantMessage.sources = response.value;
-        } else if (response.type === 'done') {
-          this.isStreaming = false;
-        } else if (response.type === 'error') {
-          assistantMessage.content = `Error: ${response.value}`;
-          this.isStreaming = false;
+    this.timerInterval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      assistantMsg.totalTime = elapsed; // Total time always ticks up
+      
+      if (!hasCalculatedTime) {
+        assistantMsg.thinkTime = elapsed; // Think time only ticks up if it hasn't typed yet
+      }
+      this.cd.detectChanges(); // Tell Angular to update the screen!
+    }, 100);
+
+    // 4. Call the Backend
+    this.chatService.streamChat(messageToSend, this.selectedSubject).subscribe({
+      next: (res: StreamResponse) => {
+        
+        // LAP 1: The first word arrives! Lock the Think Time.
+        if (!hasCalculatedTime && res.type === 'token' && res.value) {
+          hasCalculatedTime = true;
         }
+
+        if (res.type === 'sources') {
+          assistantMsg.sources = res.value;
+        } else if (res.type === 'token') {
+          assistantMsg.content += res.value;
+        } else if (res.type === 'error') {
+          assistantMsg.content = `Error: ${res.value}`;
+        }
+        this.cd.detectChanges();
       },
-      error: () => {
-        assistantMessage.content = 'Error: Failed to get response from server.';
+      error: (err) => {
+        clearInterval(this.timerInterval); // Stop the watch on error
         this.isStreaming = false;
+        this.cd.detectChanges();
+      },
+      complete: () => {
+        clearInterval(this.timerInterval); // FINISH LINE: Stop the watch!
+        this.isStreaming = false;
+        this.cd.detectChanges();
       }
     });
   }

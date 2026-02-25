@@ -7,6 +7,7 @@ export interface ChatMessage {
   content: string;
   sources?: string[];
   timestamp: Date;
+  responseTime?: number; // <-- ADD THIS LINE
 }
 
 export interface StreamResponse {

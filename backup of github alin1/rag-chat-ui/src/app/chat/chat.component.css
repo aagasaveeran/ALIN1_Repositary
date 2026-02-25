@@ -127,8 +127,6 @@ button:disabled { background: #95a5a6; }
 
 
 
-
-
 /* --- MAIN WRAPPER & ANIMATED BACKGROUND --- */
 .glass-wrapper {
   position: relative;
@@ -365,18 +363,31 @@ button:disabled { background: #95a5a6; }
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-/* --- TYPING INDICATOR (LOADING STATE) --- */
-.typing-indicator {
+/* --- TIMER BADGES --- */
+.time-badge {
+  font-weight: 500;
+  font-size: 0.65rem;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.think-badge {
+  background: rgba(139, 92, 246, 0.2); /* Soft purple */
+  color: #c4b5fd;
+}
+
+.total-badge {
+  background: rgba(59, 130, 246, 0.2); /* Soft blue */
+  color: #93c5fd;
+}
+
+/* --- INLINE TYPING DOTS (Inside the bubble) --- */
+.inline-typing {
   display: flex;
   gap: 6px;
-  padding: 15px 20px;
-  width: fit-content;
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-bottom-left-radius: 4px;
-  margin-bottom: 10px;
-  animation: glassFlip 0.5s ease-out forwards;
+  padding: 10px 0;
 }
 
 .dot {
@@ -393,4 +404,22 @@ button:disabled { background: #95a5a6; }
 @keyframes bounce {
   0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
   40% { transform: scale(1); opacity: 1; }
+}
+
+/* --- ACTIVE STREAMING BUBBLE EFFECT --- */
+/* Gives the bubble a soft, pulsing energy field while ALIN1 is typing */
+.message-bubble.streaming-text {
+  border: 1px solid rgba(0, 210, 255, 0.4);
+  animation: glassPulse 2s infinite alternate ease-in-out;
+}
+
+@keyframes glassPulse {
+  0% {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1), 
+                inset 0 0 0px rgba(0, 210, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 25px rgba(0, 210, 255, 0.25), 
+                inset 0 0 15px rgba(0, 210, 255, 0.1);
+  }
 }

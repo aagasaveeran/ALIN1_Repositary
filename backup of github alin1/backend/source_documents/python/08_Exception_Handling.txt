@@ -1,0 +1,48 @@
+Chapter 8: Exception Handling – Managing Errors
+Welcome to Error Management! No matter how good a programmer you are, errors will happen. A user might enter text when you asked for a number, or a file you are looking for might be missing. If we don't handle these errors, our program will "crash" (stop working abruptly). Exception Handling allows our program to catch these errors and continue running smoothly.
+8.1 Types of Errors
+The instructor explains that there are three main types of errors you will encounter:
+1. Syntax Error: This is a grammatical mistake, like missing a colon : or a closing bracket ). Python catches this before the program even runs.
+2. Logical Error: The program runs without crashing, but gives the wrong answer.
+    ◦ Example: You wanted to add a + b, but you accidentally wrote a + a. Python won't stop you, but the result is wrong.
+3. Runtime Error: The program starts running fine, but something unexpected happens during execution that makes it crash.
+    ◦ Example: You ask the user for a number, but they type "Hello". Python tries to convert "Hello" to an integer and crashes.
+8.2 The try and except Block
+We use try and except to handle Runtime Errors.
+• try: We put the "suspicious" code here (code that might fail).
+• except: We put the "backup plan" here (what to do if the code fails).
+Scenario: Imagine a simple calculator. If the user enters "Hi" instead of a number, we don't want the program to show a scary red error message. We want it to say "Invalid Input".
+Code Example:
+try:
+    a = int(input("Enter number A: "))
+    b = int(input("Enter number B: "))
+    print(a + b)
+except:
+    print("Something went wrong")
+• How it works:
+    ◦ If you enter numbers 10 and 20, it works perfectly.
+    ◦ If you enter 10 and Hi, Python stops the try block immediately and jumps to the except block, printing "Something went wrong".
+8.3 Handling Specific Errors
+Not all errors are the same. Sometimes the user types the wrong thing (ValueError), and sometimes they try to divide by zero (ZeroDivisionError). We can handle each one separately.
+Code Example:
+try:
+    a = int(input())
+    b = int(input())
+    print(a / b)  # Division
+
+except ValueError:
+    print("Value Error") # Runs if user types text instead of a number
+
+except ZeroDivisionError:
+    print("Cannot divide by zero") # Runs if user enters 0 for 'b'
+
+except Exception as e:
+    print("Something went wrong:", e) # Catches any other error
+• Explanation:
+    ◦ If you input 10 and Hi: Python jumps to except ValueError.
+    ◦ If you input 10 and 0: Python jumps to except ZeroDivisionError.
+    ◦ Exception as e: This is a "catch-all" that grabs any other error and stores the error message in the variable e, so you can print it.
+8.4 Why is this important?
+Without Exception Handling, if a user makes one small mistake, your entire software shuts down. With try and except, your software stays alive and politely asks the user to correct their mistake.
+
+--------------------------------------------------------------------------------
