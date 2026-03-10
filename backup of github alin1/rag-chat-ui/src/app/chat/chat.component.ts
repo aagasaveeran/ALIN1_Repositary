@@ -1,4 +1,4 @@
-import { Component, OnInit, ChangeDetectorRef } from '@angular/core'; // <-- Added ChangeDetectorRef here
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Injectable, NgZone } from '@angular/core';
@@ -11,13 +11,15 @@ export interface StreamResponse {
   value?: any;
 }
 
+// --- 🚀 UPDATED INTERFACE ---
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
-  sources?: string[];
+  // Changed from string[] to any[] to support {id: string, topic: string}
+  sources?: any[]; 
   timestamp: Date;
-  thinkTime?: number; // Time until the first word is typed
-  totalTime?: number; // Total time from start to finish
+  thinkTime?: number; 
+  totalTime?: number; 
 }
 
 @Injectable({
@@ -71,8 +73,6 @@ export class ChatService {
   }
 }
 
-// ... (keep your imports and interfaces exactly the same) ...
-
 @Component({
   selector: 'app-chat',
   standalone: true,
@@ -88,7 +88,7 @@ export class ChatComponent implements OnInit {
   isStreaming: boolean = false;
   subjects: string[] = ['general', 'english', 'maths', 'python', 'rtl'];
 
-  timerInterval: any; // <-- ADD THIS to hold our stopwatch
+  timerInterval: any; 
 
   constructor(private chatService: ChatService, private cd: ChangeDetectorRef) {}
 
@@ -97,7 +97,6 @@ export class ChatComponent implements OnInit {
   sendMessage() {
     if (!this.userInput.trim() || this.isStreaming) return;
 
-    // 1. Setup the User Message
     const userMsg: ChatMessage = {
       role: 'user',
       content: this.userInput,
@@ -109,7 +108,6 @@ export class ChatComponent implements OnInit {
     this.userInput = '';
     this.isStreaming = true;
 
-    // 2. Instantly push the Assistant Bubble so it animates in immediately
     const assistantMsg: ChatMessage = {
       role: 'assistant',
       content: '',
@@ -120,25 +118,21 @@ export class ChatComponent implements OnInit {
     };
     this.messages.push(assistantMsg);
 
-    // 3. START THE LIVE STOPWATCH
     const startTime = Date.now();
     let hasCalculatedTime = false; 
 
     this.timerInterval = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000;
-      assistantMsg.totalTime = elapsed; // Total time always ticks up
+      assistantMsg.totalTime = elapsed; 
       
       if (!hasCalculatedTime) {
-        assistantMsg.thinkTime = elapsed; // Think time only ticks up if it hasn't typed yet
+        assistantMsg.thinkTime = elapsed; 
       }
-      this.cd.detectChanges(); // Tell Angular to update the screen!
+      this.cd.detectChanges(); 
     }, 100);
 
-    // 4. Call the Backend
     this.chatService.streamChat(messageToSend, this.selectedSubject).subscribe({
       next: (res: StreamResponse) => {
-        
-        // LAP 1: The first word arrives! Lock the Think Time.
         if (!hasCalculatedTime && res.type === 'token' && res.value) {
           hasCalculatedTime = true;
         }
@@ -153,12 +147,12 @@ export class ChatComponent implements OnInit {
         this.cd.detectChanges();
       },
       error: (err) => {
-        clearInterval(this.timerInterval); // Stop the watch on error
+        clearInterval(this.timerInterval);
         this.isStreaming = false;
         this.cd.detectChanges();
       },
       complete: () => {
-        clearInterval(this.timerInterval); // FINISH LINE: Stop the watch!
+        clearInterval(this.timerInterval);
         this.isStreaming = false;
         this.cd.detectChanges();
       }

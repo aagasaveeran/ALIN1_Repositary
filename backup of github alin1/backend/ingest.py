@@ -235,106 +235,303 @@
 #     ingest_text_file(TARGET_FILE, TARGET_SUBJECT)
 
 
-######### multi files ingest is below########
+# ######### multi files ingest is below########
+
+# import os
+# from pathlib import Path
+# import chromadb
+
+# # Import our database map and embedding logic
+# from rag_core import embed_text, DB_MAP
+
+# # Define where you will drop your raw text files
+# SOURCE_DIR = Path("source_documents")
+
+# def smart_chunk_text(text, max_chars=1000):
+#     """Splits text into safe chunks for embedding."""
+#     raw_paragraphs = text.split('\n\n')
+#     safe_chunks = []
+    
+#     for para in raw_paragraphs:
+#         para = para.strip()
+#         if not para: continue
+            
+#         if len(para) < max_chars:
+#             safe_chunks.append(para)
+#         else:
+#             words = para.split(' ')
+#             current_chunk = ""
+#             for word in words:
+#                 if len(current_chunk) + len(word) + 1 < max_chars:
+#                     current_chunk += " " + word
+#                 else:
+#                     safe_chunks.append(current_chunk.strip())
+#                     current_chunk = word
+#             if current_chunk:
+#                 safe_chunks.append(current_chunk.strip())
+#     return safe_chunks
+
+# def process_all_subjects():
+#     print("🚀 SCRIPT STARTED: Batch Subject Ingestion\n")
+    
+#     # Ensure the main source directory exists
+#     SOURCE_DIR.mkdir(exist_ok=True)
+    
+#     # Loop through every subject defined in our rag_core.py DB_MAP
+#     for subject, db_path in DB_MAP.items():
+#         # 1. Create a drop-folder for the subject if it doesn't exist
+#         subject_folder = SOURCE_DIR / subject
+#         subject_folder.mkdir(exist_ok=True)
+        
+#         # 2. Find all .txt files in that folder
+#         txt_files = list(subject_folder.glob("*.txt"))
+        
+#         if not txt_files:
+#             print(f"⏭️  SKIPPING {subject.upper()}: No .txt files found in '{subject_folder}'")
+#             continue
+            
+#         print(f"📚 PROCESSING SUBJECT: {subject.upper()}")
+        
+#         # 3. Connect to the ChromaDB for this specific subject
+#         db_path.mkdir(parents=True, exist_ok=True)
+#         client = chromadb.PersistentClient(path=str(db_path))
+        
+#         # Clear the old database so we don't duplicate data
+#         try:
+#             client.delete_collection("book_content")
+#         except:
+#             pass
+            
+#         collection = client.create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+        
+#         # 4. Process every file in the subject folder
+#         total_chunks_for_subject = 0
+        
+#         for file_path in txt_files:
+#             print(f"   📄 Reading file: {file_path.name}")
+#             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+#                 text = f.read()
+                
+#             chunks = smart_chunk_text(text)
+#             if not chunks:
+#                 continue
+                
+#             batch_size = 10
+#             for i in range(0, len(chunks), batch_size):
+#                 batch = chunks[i : i + batch_size]
+                
+#                 # Create unique IDs so files don't overwrite each other
+#                 ids = [f"{file_path.stem}_chunk_{total_chunks_for_subject+j}" for j in range(len(batch))]
+#                 metadatas = [{"chunk_id": f"Section {total_chunks_for_subject+j}", "source": file_path.name, "subject": subject} for j in range(len(batch))]
+                
+#                 try:
+#                     embeddings = [embed_text(c, task_type="document") for c in batch]
+#                     collection.add(ids=ids, embeddings=embeddings, documents=batch, metadatas=metadatas)
+#                     total_chunks_for_subject += len(batch)
+#                     print(f"      - Embedded {total_chunks_for_subject} chunks...", end='\r')
+#                 except Exception as e:
+#                     print(f"\n❌ Error on batch: {e}")
+                    
+#         print(f"\n   ✅ Finished {subject.upper()}! Added {total_chunks_for_subject} total chunks to the DB.\n")
+
+# if __name__ == "__main__":
+#     process_all_subjects()
+
+
+
+#################without redundancy is below#################
+# import os
+# from pathlib import Path
+# import chromadb
+# import uuid
+# # Import our database map and embedding logic from your rag_core
+# from rag_core import embed_text, DB_MAP
+
+# # Define where you will drop your raw text files
+# SOURCE_DIR = Path("source_documents")
+
+# def advanced_chunk_text(text, chunk_size=1000, overlap=200):
+#     """
+#     Creates overlapping chunks so Qwen doesn't lose context at the edges.
+#     Example: Chunk 1 ends with 'The for loop...', Chunk 2 starts with 'for loop is used...'
+#     """
+#     chunks = []
+#     # Slide a window across the text
+#     for i in range(0, len(text), chunk_size - overlap):
+#         chunk = text[i : i + chunk_size].strip()
+#         if chunk:
+#             chunks.append(chunk)
+#     return chunks
+
+# def process_all_subjects():
+#     print("🚀 ALIN1 SYSTEM: Deep Learning Ingestion Started\n")
+    
+#     SOURCE_DIR.mkdir(exist_ok=True)
+    
+#     for subject, db_path in DB_MAP.items():
+#         subject_folder = SOURCE_DIR / subject
+#         subject_folder.mkdir(exist_ok=True)
+        
+#         txt_files = list(subject_folder.glob("*.txt"))
+        
+#         if not txt_files:
+#             print(f"⏭️  SKIPPING {subject.upper()}: No .txt files in '{subject_folder}'")
+#             continue
+            
+#         print(f"📚 TEACHING ALIN1: {subject.upper()}")
+        
+#         db_path.mkdir(parents=True, exist_ok=True)
+#         client = chromadb.PersistentClient(path=str(db_path))
+        
+#         # We RE-CREATE the collection to ensure a clean, optimized index
+#         try:
+#             client.delete_collection("book_content")
+#         except:
+#             pass
+            
+#         collection = client.create_collection(
+#             name="book_content", 
+#             metadata={"hnsw:space": "cosine"}
+#         )
+        
+#         total_chunks_for_subject = 0
+        
+#         for file_path in txt_files:
+#             print(f"   📄 Reading: {file_path.name}")
+#             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+#                 text = f.read()
+                
+#             # Using the new Advanced Chunking with Overlap
+#             chunks = advanced_chunk_text(text, chunk_size=1000, overlap=200)
+            
+#             if not chunks: continue
+                
+#             for i, chunk in enumerate(chunks):
+#                 # We use a UUID + file name to prevent any ID collisions
+#                 unique_id = f"{file_path.stem}_{uuid.uuid4().hex[:8]}"
+                
+#                 try:
+#                     # Embed using your 8-thread optimized function from rag_core
+#                     vector = embed_text(chunk, task_type="document")
+                    
+#                     collection.add(
+#                         ids=[unique_id],
+#                         embeddings=[vector],
+#                         documents=[chunk],
+#                         metadatas=[{
+#                             "chunk_id": f"Section {total_chunks_for_subject}", 
+#                             "source": file_path.name, 
+#                             "subject": subject
+#                         }]
+#                     )
+#                     total_chunks_for_subject += 1
+#                     if total_chunks_for_subject % 10 == 0:
+#                         print(f"      - Processed {total_chunks_for_subject} chunks...", end='\r')
+#                 except Exception as e:
+#                     print(f"\n❌ Embedding Error: {e}")
+                    
+#         print(f"\n   ✅ {subject.upper()} COMPLETE! {total_chunks_for_subject} chunks indexed.\n")
+
+# if __name__ == "__main__":
+#     process_all_subjects()
+
+
+
+
+#################### below is metadata and first line the topic vise####################
 
 import os
 from pathlib import Path
 import chromadb
-
-# Import our database map and embedding logic
+import uuid
+# Import our database map and embedding logic from your rag_core
 from rag_core import embed_text, DB_MAP
 
 # Define where you will drop your raw text files
 SOURCE_DIR = Path("source_documents")
 
-def smart_chunk_text(text, max_chars=1000):
-    """Splits text into safe chunks for embedding."""
-    raw_paragraphs = text.split('\n\n')
-    safe_chunks = []
-    
-    for para in raw_paragraphs:
-        para = para.strip()
-        if not para: continue
-            
-        if len(para) < max_chars:
-            safe_chunks.append(para)
-        else:
-            words = para.split(' ')
-            current_chunk = ""
-            for word in words:
-                if len(current_chunk) + len(word) + 1 < max_chars:
-                    current_chunk += " " + word
-                else:
-                    safe_chunks.append(current_chunk.strip())
-                    current_chunk = word
-            if current_chunk:
-                safe_chunks.append(current_chunk.strip())
-    return safe_chunks
+def advanced_chunk_text(text, chunk_size=1000, overlap=200):
+    """
+    Creates overlapping chunks so Qwen doesn't lose context at the edges.
+    """
+    chunks = []
+    for i in range(0, len(text), chunk_size - overlap):
+        chunk = text[i : i + chunk_size].strip()
+        if chunk:
+            chunks.append(chunk)
+    return chunks
 
 def process_all_subjects():
-    print("🚀 SCRIPT STARTED: Batch Subject Ingestion\n")
+    print("🚀 ALIN1 SYSTEM: Deep Learning Ingestion Started (with Topic Extraction)\n")
     
-    # Ensure the main source directory exists
     SOURCE_DIR.mkdir(exist_ok=True)
     
-    # Loop through every subject defined in our rag_core.py DB_MAP
     for subject, db_path in DB_MAP.items():
-        # 1. Create a drop-folder for the subject if it doesn't exist
         subject_folder = SOURCE_DIR / subject
         subject_folder.mkdir(exist_ok=True)
         
-        # 2. Find all .txt files in that folder
         txt_files = list(subject_folder.glob("*.txt"))
         
         if not txt_files:
-            print(f"⏭️  SKIPPING {subject.upper()}: No .txt files found in '{subject_folder}'")
+            print(f"⏭️  SKIPPING {subject.upper()}: No .txt files in '{subject_folder}'")
             continue
             
-        print(f"📚 PROCESSING SUBJECT: {subject.upper()}")
+        print(f"📚 TEACHING ALIN1: {subject.upper()}")
         
-        # 3. Connect to the ChromaDB for this specific subject
         db_path.mkdir(parents=True, exist_ok=True)
         client = chromadb.PersistentClient(path=str(db_path))
         
-        # Clear the old database so we don't duplicate data
         try:
             client.delete_collection("book_content")
         except:
             pass
             
-        collection = client.create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+        collection = client.create_collection(
+            name="book_content", 
+            metadata={"hnsw:space": "cosine"}
+        )
         
-        # 4. Process every file in the subject folder
         total_chunks_for_subject = 0
         
         for file_path in txt_files:
-            print(f"   📄 Reading file: {file_path.name}")
+            print(f"   📄 Reading: {file_path.name}")
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 text = f.read()
                 
-            chunks = smart_chunk_text(text)
-            if not chunks:
-                continue
+            chunks = advanced_chunk_text(text, chunk_size=1000, overlap=200)
+            
+            if not chunks: continue
                 
-            batch_size = 10
-            for i in range(0, len(chunks), batch_size):
-                batch = chunks[i : i + batch_size]
+            for i, chunk in enumerate(chunks):
+                unique_id = f"{file_path.stem}_{uuid.uuid4().hex[:8]}"
                 
-                # Create unique IDs so files don't overwrite each other
-                ids = [f"{file_path.stem}_chunk_{total_chunks_for_subject+j}" for j in range(len(batch))]
-                metadatas = [{"chunk_id": f"Section {total_chunks_for_subject+j}", "source": file_path.name, "subject": subject} for j in range(len(batch))]
+                # --- 🚀 NEW: TOPIC EXTRACTION LOGIC ---
+                # Look at the first line. If it contains brackets, treat it as the Topic.
+                lines = chunk.split('\n')
+                first_line = lines[0].strip()
+                topic_label = first_line.replace('[', '').replace(']', '') if '[' in first_line else "General Reference"
                 
                 try:
-                    embeddings = [embed_text(c, task_type="document") for c in batch]
-                    collection.add(ids=ids, embeddings=embeddings, documents=batch, metadatas=metadatas)
-                    total_chunks_for_subject += len(batch)
-                    print(f"      - Embedded {total_chunks_for_subject} chunks...", end='\r')
-                except Exception as e:
-                    print(f"\n❌ Error on batch: {e}")
+                    vector = embed_text(chunk, task_type="document")
                     
-        print(f"\n   ✅ Finished {subject.upper()}! Added {total_chunks_for_subject} total chunks to the DB.\n")
+                    collection.add(
+                        ids=[unique_id],
+                        embeddings=[vector],
+                        documents=[chunk],
+                        metadatas=[{
+                            "chunk_id": f"Section {total_chunks_for_subject}", 
+                            "source": file_path.name, 
+                            "subject": subject,
+                            "topic": topic_label # <--- Now storing the clean Topic name
+                        }]
+                    )
+                    total_chunks_for_subject += 1
+                    if total_chunks_for_subject % 10 == 0:
+                        print(f"      - Processed {total_chunks_for_subject} chunks...", end='\r')
+                except Exception as e:
+                    print(f"\n❌ Embedding Error: {e}")
+                    
+        print(f"\n   ✅ {subject.upper()} COMPLETE! {total_chunks_for_subject} chunks indexed.\n")
 
 if __name__ == "__main__":
     process_all_subjects()
-
-

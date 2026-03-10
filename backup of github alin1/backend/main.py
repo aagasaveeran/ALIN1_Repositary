@@ -576,16 +576,156 @@
 #     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 
+#  below is sources in id like 78 56 or something
+
+# import os
+# import json
+# import uvicorn
+# from fastapi import FastAPI, Query
+# from fastapi.middleware.cors import CORSMiddleware
+# from sse_starlette.sse import EventSourceResponse
+# from ollama import Client
+
+# # 1. FORCE LOCALHOST
+# os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+
+# # Import logic from rag_core
+# from rag_core import (
+#     build_rag_context,
+#     add_memory,
+#     clear_chat_history,
+#     MODEL_NAME,
+#     DB_MAP 
+# )
+
+# app = FastAPI(title="ALIN1 AI Tutor System")
+
+# # Ensure NO GzipMiddleware is added here!
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# ollama_client = Client(host='http://127.0.0.1:11434')
+
+# OLLAMA_OPTIONS = {
+#     "num_thread": 8,
+#     "temperature": 0.2,
+#     "num_ctx": 4096,
+#     "top_p": 0.9,
+# }
+
+# SUBJECT_PROMPTS = {
+#     "rtl": "You are ALIN1, a wise guide for 'Indian Culture and Universal Values'. Focus on holistic growth.",
+#     "python": "You are ALIN1, a Senior Python Instructor. Focus on clean, PEP-8 compliant code.",
+#     "maths": "You are ALIN1, a Mathematics Professor. Solve problems step-by-step clearly.",
+#     "english": "You are ALIN1, a Literature and Grammar Expert. Focus on clarity and tone."
+# }
+
+# @app.get("/books")
+# def get_books():
+#     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
+
+# @app.get("/chat/stream")
+# async def stream_chat(
+#     message: str = Query(...), 
+#     subject: str = Query("rtl")
+# ):
+#     if subject not in DB_MAP:
+#         subject = "rtl"
+
+#     async def event_generator():
+#         # --- 🚀 CHANGE 1: CONNECTION HANDSHAKE ---
+#         # Send an empty token immediately to "warm up" the SSE pipe
+#         yield json.dumps({"token": ""})
+
+#         try:
+#             # 1. Retrieval
+#             rag_context, sources = build_rag_context(message, subject=subject)
+            
+#             # 2. Send sources immediately
+#             if sources:
+#                 source_ids = [str(s['id']) for s in sources]
+#                 yield json.dumps({"sources": source_ids})
+            
+#             # 3. Build Prompt
+#             base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
+#             if sources and rag_context:
+#                 system_prompt = f"{base_persona}\nAnswer using ONLY the context provided.\nRAG CONTEXT:\n{rag_context}"
+#             else:
+#                 system_prompt = f"Strictly say: 'I'm sorry, I couldn't find any information about that in the {subject.upper()} material.'"
+
+#             messages = [
+#                 {"role": "system", "content": system_prompt},
+#                 {"role": "user", "content": message}
+#             ]
+            
+#             # 4. STREAMING GENERATION
+#             full_response = ""
+#             stream = ollama_client.chat(
+#                 model=MODEL_NAME, 
+#                 messages=messages, 
+#                 stream=True,
+#                 options=OLLAMA_OPTIONS
+#             )
+            
+#             for chunk in stream:
+#                 if 'message' in chunk and 'content' in chunk['message']:
+#                     token = chunk['message']['content']
+#                     if token:
+#                         full_response += token
+#                         # --- 🚀 CHANGE 2: RAW FLUSH ---
+#                         # We yield the token immediately. EventSourceResponse 
+#                         # will try to push this to the network now.
+#                         yield json.dumps({"token": token})
+            
+#             # 5. Finalize
+#             add_memory(message, full_response)
+#             yield json.dumps({"done": True})
+            
+#         except Exception as e:
+#             yield json.dumps({"error": str(e)})
+
+#     # --- 🚀 CHANGE 3: ANTI-BUFFERING HEADERS ---
+#     headers = {
+#         "X-Accel-Buffering": "no",  # Tells proxies not to wait for more data
+#         "Cache-Control": "no-cache",
+#         "Connection": "keep-alive",
+#         "Content-Type": "text/event-stream"
+#     }
+
+#     return EventSourceResponse(
+#         event_generator(), 
+#         headers=headers
+#     )
+
+# @app.post("/clear")
+# async def clear_memory():
+#     result = clear_chat_history('YES')
+#     return {"status": result}
+
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 
 
 
 
+#below is the version with sources in topic names like this topic:
+
+
+import os
+import json
+import uvicorn
 from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
-import json
-import ollama
-import uvicorn
+from ollama import Client
+
+# 1. FORCE LOCALHOST
+os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
 
 # Import logic from rag_core
 from rag_core import (
@@ -593,11 +733,12 @@ from rag_core import (
     add_memory,
     clear_chat_history,
     MODEL_NAME,
-    DB_MAP  # Import the map so we can validate subjects
+    DB_MAP 
 )
 
 app = FastAPI(title="ALIN1 AI Tutor System")
 
+# Ensure NO GzipMiddleware is added here!
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -606,88 +747,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# === 1. DYNAMIC SYSTEM PROMPTS ===
-# This dictionary changes the AI's personality based on the selected dropdown
+ollama_client = Client(host='http://127.0.0.1:11434')
+
+OLLAMA_OPTIONS = {
+    "num_thread": 8,
+    "temperature": 0.2,
+    "num_ctx": 4096,
+    "top_p": 0.9,
+}
+
 SUBJECT_PROMPTS = {
-    "rtl": """You are ALIN1, a wise guide for 'Indian Culture and Universal Values' (RTL).
-    Focus on holistic growth, integrity, and inner transformation.
-    Use metaphors from nature where appropriate.""",
-    
-    "python": """You are ALIN1, a Senior Python Developer and Instructor.
-    Focus on writing clean, efficient, and PEP-8 compliant code.
-    Always explain the logic behind your code snippets.""",
-    
-    "maths": """You are ALIN1, a Mathematics Professor.
-    Solve problems step-by-step. Show your working clearly.
-    If a formula is used, state it first.""",
-    
-    "english": """You are ALIN1, a Literature and Grammar Expert.
-    Focus on clarity, tone, and vocabulary.
-    Correct any grammatical errors you see in the user's input politely."""
+    "rtl": "You are ALIN1, a wise guide for 'Indian Culture and Universal Values'. Focus on holistic growth.",
+    "python": "You are ALIN1, a Senior Python Instructor. Focus on clean, PEP-8 compliant code.",
+    "maths": "You are ALIN1, a Mathematics Professor. Solve problems step-by-step clearly.",
+    "english": "You are ALIN1, a Literature and Grammar Expert. Focus on clarity and tone."
 }
 
 @app.get("/books")
 def get_books():
-    """Returns the list of available subjects for the dropdown."""
-    # We return the keys of our DB_MAP (rtl, python, maths, etc.)
     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
 
 @app.get("/chat/stream")
 async def stream_chat(
     message: str = Query(...), 
-    subject: str = Query("rtl") # <--- NEW PARAMETER (Defaults to RTL)
+    subject: str = Query("rtl")
 ):
-    # Validate the subject (security check)
     if subject not in DB_MAP:
         subject = "rtl"
 
     async def event_generator():
+        # --- 🚀 CONNECTION HANDSHAKE ---
+        yield json.dumps({"token": ""})
+
         try:
-            # 1. Retrieve Context for the SPECIFIC SUBJECT
+            # 1. Retrieval
             rag_context, sources = build_rag_context(message, subject=subject)
             
-            # 2. Send sources to UI
+            # --- 🚀 UPDATED: ENRICHED SOURCES ---
+            # Instead of just IDs, we send objects containing the Topic
             if sources:
-                source_ids = [str(s['id']) for s in sources]
-                yield json.dumps({"sources": source_ids})
+                source_data = [
+                    {
+                        "id": str(s['id']), 
+                        "topic": s.get('topic', 'Reference') # Fallback to 'Reference' if missing
+                    } 
+                    for s in sources
+                ]
+                yield json.dumps({"sources": source_data})
             
-            # 3. Select the correct Persona
+            # 3. Build Prompt
             base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
-            
-            # 4. Construct the Final Prompt
-           # ... (previous code) ...
             if sources and rag_context:
-                system_prompt = f"""{base_persona}
-
-                CRITICAL INSTRUCTION:
-                Answer using ONLY the context provided below.
-                
-                RULES:
-                1. If the answer is found in the "{subject.upper()} TEXTBOOK", explain it clearly.
-                2. If the user asks something NOT in the text, say: "I am sorry, but that topic is not covered in the {subject.upper()} course material."
-                3. Cite sources (e.g., [Source: Section 550]) if available.
-
-                RAG CONTEXT:
-                {rag_context}
-                
-                User Question: "{message}"
-                """
+                system_prompt = f"{base_persona}\nAnswer using ONLY the context provided.\nRAG CONTEXT:\n{rag_context}"
             else:
-                # STRICT FALLBACK: Remove the base persona entirely so it doesn't hallucinate metaphors
-                system_prompt = f"""You are a strict system assistant. 
-                The user asked a question, but NO information was found in the {subject.upper()} database.
-                You MUST reply with EXACTLY this sentence and nothing else: 
-                "I'm sorry, I couldn't find any information about that in the {subject.upper()} course material."
-                DO NOT add any metaphors, greetings, or explanations.
-                """
+                system_prompt = f"Strictly say: 'I'm sorry, I couldn't find any information about that in the {subject.upper()} material.'"
 
             messages = [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": message}
             ]
             
+            # 4. STREAMING GENERATION
             full_response = ""
-            stream = ollama.chat(model=MODEL_NAME, messages=messages, stream=True)
+            stream = ollama_client.chat(
+                model=MODEL_NAME, 
+                messages=messages, 
+                stream=True,
+                options=OLLAMA_OPTIONS
+            )
             
             for chunk in stream:
                 if 'message' in chunk and 'content' in chunk['message']:
@@ -696,13 +823,25 @@ async def stream_chat(
                         full_response += token
                         yield json.dumps({"token": token})
             
+            # 5. Finalize
             add_memory(message, full_response)
             yield json.dumps({"done": True})
             
         except Exception as e:
             yield json.dumps({"error": str(e)})
 
-    return EventSourceResponse(event_generator())
+    # --- 🚀 ANTI-BUFFERING HEADERS ---
+    headers = {
+        "X-Accel-Buffering": "no",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Content-Type": "text/event-stream"
+    }
+
+    return EventSourceResponse(
+        event_generator(), 
+        headers=headers
+    )
 
 @app.post("/clear")
 async def clear_memory():

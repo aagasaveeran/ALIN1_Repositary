@@ -272,19 +272,181 @@
 
 
 
-############ before multi syllabic embedding fix ############
+############ before multi syllabic embedding fix is up ############
 
+
+# import chromadb
+# from pathlib import Path
+# import ollama
+
+# # CONFIGURATION
+# MODEL_NAME = "llama3:latest"
+# EMBEDDING_MODEL = "nomic-embed-text:latest"
+
+# # 1. DATABASE PATHS MAP
+# # We now have a folder for EACH subject
+# DB_ROOT = Path("subject_dbs")
+# DB_MAP = {
+#     "rtl": DB_ROOT / "rtl_db",
+#     "python": DB_ROOT / "python_db",
+#     "maths": DB_ROOT / "maths_db",
+#     "english": DB_ROOT / "english_db"
+# }
+
+# CHROMA_CHAT_PATH = Path("chroma_memory_db")
+
+# # Initialize Chat Memory (Global)
+# chat_client = chromadb.PersistentClient(path=str(CHROMA_CHAT_PATH))
+
+# # 2. DYNAMIC CLIENT LOADING
+# # We will load the specific subject DB only when needed
+# def get_subject_collection(subject: str):
+#     """Loads the specific database for the requested subject."""
+#     if subject not in DB_MAP:
+#         print(f"❌ Error: Subject '{subject}' not found in DB_MAP")
+#         return None
+        
+#     db_path = DB_MAP[subject]
+    
+#     # Create the folder if it doesn't exist yet (prevents crashes)
+#     if not db_path.exists():
+#         db_path.mkdir(parents=True, exist_ok=True)
+
+#     client = chromadb.PersistentClient(path=str(db_path))
+#     try:
+#         # Note: We enforce 'cosine' distance for all subjects
+#         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+#     except Exception as e:
+#         print(f"⚠️ Error loading {subject} DB: {e}")
+#         return None
+
+# # Common Embedding Function
+# def embed_text(text: str, task_type: str = "document"):
+#     if "nomic" in EMBEDDING_MODEL:
+#         prefix = "search_query: " if task_type == "query" else "search_document: "
+#         if not text.startswith(prefix):
+#             text = prefix + text
+#     return ollama.embeddings(model=EMBEDDING_MODEL, prompt=text)['embedding']
+
+# def get_or_create_chat_collection():
+#     return chat_client.get_or_create_collection(name="chat_memory", metadata={"hnsw:space": "cosine"})
+
+# chat_collection = get_or_create_chat_collection()
+
+# # === MEMORY & HISTORY UTILS (Unchanged) ===
+# def get_recent_history(n_turns=2):
+#     try:
+#         all_data = chat_collection.get()
+#         ids = all_data['ids']
+#         if not ids: return []
+#         sorted_ids = sorted(ids, key=lambda x: int(x.split('_')[1]))
+#         recent_ids = sorted_ids[-n_turns:]
+#         recent_data = chat_collection.get(ids=recent_ids)
+#         id_doc_map = {id_: doc for id_, doc in zip(recent_data['ids'], recent_data['documents'])}
+#         return [id_doc_map[id_] for id_ in recent_ids]
+#     except: return []
+
+# def contextualize_query(user_query: str):
+#     history_docs = get_recent_history(n_turns=2)
+#     if not history_docs: return user_query
+    
+#     prompt = f"""Conversation History:
+# {"\n".join(history_docs)}
+
+# Current Question: "{user_query}"
+
+# TASK: Rewrite the 'Current Question' to be a standalone search query.
+# CRITICAL RULES:
+# 1. If the 'Current Question' uses pronouns (it, he, they, this) referring to the History, replace them with the specific noun.
+# 2. If the 'Current Question' is a COMPLETELY NEW TOPIC (like switching from 'Integrity' to 'Python'), DO NOT combine them. Just return the 'Current Question' exactly as it is.
+
+# Output ONLY the rewritten question. NO extra text."""
+    
+#     response = ollama.generate(model=MODEL_NAME, prompt=prompt)
+#     return response['response'].strip().replace('"', '')
+
+# def add_memory(user_text: str, assistant_text: str):
+#     combined = f"User: {user_text}\nAssistant: {assistant_text}"
+#     existing_ids = chat_collection.get()['ids']
+#     next_id = (max([int(x.split('_')[1]) for x in existing_ids]) + 1) if existing_ids else 1
+#     chat_collection.add(
+#         embeddings=[embed_text(combined, task_type="document")],
+#         documents=[combined],
+#         metadatas=[{"type": "conversation_turn"}],
+#         ids=[f"turn_{next_id}"]
+#     )
+
+# # === NEW: RETRIEVE FROM SPECIFIC SUBJECT ===
+# def retrieve_book_rag(query: str, subject: str, n_results=3):
+#     print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
+    
+#     collection = get_subject_collection(subject)
+#     if not collection or collection.count() == 0:
+#         print(f"⚠️ Warning: '{subject}' database is empty or missing.")
+#         return []
+    
+#     query_embed = embed_text(query, task_type="query")
+#     results = collection.query(
+#         query_embeddings=[query_embed], 
+#         n_results=n_results,
+#         include=["documents", "metadatas", "distances"]
+#     )
+    
+#     relevant = []
+#     if results['documents']:
+#         for i in range(len(results['documents'][0])):
+#             dist = results['distances'][0][i]
+#             if dist < 0.85: # Cosine threshold
+#                 relevant.append({
+#                     "text": results['documents'][0][i],
+#                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
+#                     "score": dist
+#                 })
+#     return relevant
+
+# def build_rag_context(user_query: str, subject: str = "rtl"):
+#     # 1. Rewrite Query
+#     search_query = contextualize_query(user_query)
+    
+#     # 2. Search TARGET Subject DB
+#     book_res = retrieve_book_rag(search_query, subject)
+    
+#     context = []
+#     if book_res:
+#         txt = "\n\n".join([f"[Source: {x['id']}] {x['text']}" for x in book_res])
+#         context.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
+    
+#     recent_history = get_recent_history(2)
+#     if recent_history:
+#          context.append("💬 RECENT HISTORY:\n" + "\n".join(recent_history))
+        
+#     return ("\n\n".join(context) if context else None), book_res
+
+# def clear_chat_history(confirm_text=None):
+#     if confirm_text == 'YES':
+#         ids = chat_collection.get().get("ids", [])
+#         if ids: chat_collection.delete(ids=ids)
+#         return "✅ Cleared"
+#     return "ℹ️ No action"
+
+
+#############  multi syllabic integration is up ############
+
+
+############# DOWN CODE IS   contexualizing and history chat reading is removed and going to be optimized hopefully in the code below. in case of fire , the up code is best to use for now. #############
 
 import chromadb
 from pathlib import Path
-import ollama
+from ollama import Client
 
-# CONFIGURATION
-MODEL_NAME = "llama3:latest"
+# 1. EXPLICIT CLIENT & CONFIG
+ollama_client = Client(host='http://127.0.0.1:11434') 
+
+# Ensure this matches your download: qwen3:4b-instruct
+MODEL_NAME = "qwen3:4b-instruct"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
-# 1. DATABASE PATHS MAP
-# We now have a folder for EACH subject
+# 2. DATABASE PATHS
 DB_ROOT = Path("subject_dbs")
 DB_MAP = {
     "rtl": DB_ROOT / "rtl_db",
@@ -295,45 +457,49 @@ DB_MAP = {
 
 CHROMA_CHAT_PATH = Path("chroma_memory_db")
 
-# Initialize Chat Memory (Global)
+# Global clients to prevent "re-opening" the DB on every message
 chat_client = chromadb.PersistentClient(path=str(CHROMA_CHAT_PATH))
+_subject_clients = {} 
 
-# 2. DYNAMIC CLIENT LOADING
-# We will load the specific subject DB only when needed
 def get_subject_collection(subject: str):
-    """Loads the specific database for the requested subject."""
     if subject not in DB_MAP:
-        print(f"❌ Error: Subject '{subject}' not found in DB_MAP")
         return None
         
-    db_path = DB_MAP[subject]
-    
-    # Create the folder if it doesn't exist yet (prevents crashes)
-    if not db_path.exists():
-        db_path.mkdir(parents=True, exist_ok=True)
+    if subject not in _subject_clients:
+        db_path = DB_MAP[subject]
+        if not db_path.exists():
+            db_path.mkdir(parents=True, exist_ok=True)
+        _subject_clients[subject] = chromadb.PersistentClient(path=str(db_path))
 
-    client = chromadb.PersistentClient(path=str(db_path))
+    client = _subject_clients[subject]
     try:
-        # Note: We enforce 'cosine' distance for all subjects
         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
     except Exception as e:
         print(f"⚠️ Error loading {subject} DB: {e}")
         return None
 
-# Common Embedding Function
+# --- 🚀 CRITICAL SPEED UPDATE ---
 def embed_text(text: str, task_type: str = "document"):
+    """Uses all 8 CPU threads to make database searching instant."""
     if "nomic" in EMBEDDING_MODEL:
         prefix = "search_query: " if task_type == "query" else "search_document: "
         if not text.startswith(prefix):
             text = prefix + text
-    return ollama.embeddings(model=EMBEDDING_MODEL, prompt=text)['embedding']
+    
+    # We add options here so the CPU doesn't 'lazy-load' the embeddings
+    response = ollama_client.embeddings(
+        model=EMBEDDING_MODEL, 
+        prompt=text,
+        options={"num_thread": 8} # <--- Force CPU power here too
+    )
+    return response['embedding']
 
+# 4. MEMORY & HISTORY UTILS
 def get_or_create_chat_collection():
     return chat_client.get_or_create_collection(name="chat_memory", metadata={"hnsw:space": "cosine"})
 
 chat_collection = get_or_create_chat_collection()
 
-# === MEMORY & HISTORY UTILS (Unchanged) ===
 def get_recent_history(n_turns=2):
     try:
         all_data = chat_collection.get()
@@ -346,43 +512,26 @@ def get_recent_history(n_turns=2):
         return [id_doc_map[id_] for id_ in recent_ids]
     except: return []
 
-def contextualize_query(user_query: str):
-    history_docs = get_recent_history(n_turns=2)
-    if not history_docs: return user_query
-    
-    prompt = f"""Conversation History:
-{"\n".join(history_docs)}
-
-Current Question: "{user_query}"
-
-TASK: Rewrite the 'Current Question' to be a standalone search query.
-CRITICAL RULES:
-1. If the 'Current Question' uses pronouns (it, he, they, this) referring to the History, replace them with the specific noun.
-2. If the 'Current Question' is a COMPLETELY NEW TOPIC (like switching from 'Integrity' to 'Python'), DO NOT combine them. Just return the 'Current Question' exactly as it is.
-
-Output ONLY the rewritten question. NO extra text."""
-    
-    response = ollama.generate(model=MODEL_NAME, prompt=prompt)
-    return response['response'].strip().replace('"', '')
-
 def add_memory(user_text: str, assistant_text: str):
-    combined = f"User: {user_text}\nAssistant: {assistant_text}"
-    existing_ids = chat_collection.get()['ids']
-    next_id = (max([int(x.split('_')[1]) for x in existing_ids]) + 1) if existing_ids else 1
-    chat_collection.add(
-        embeddings=[embed_text(combined, task_type="document")],
-        documents=[combined],
-        metadatas=[{"type": "conversation_turn"}],
-        ids=[f"turn_{next_id}"]
-    )
+    # We wrap this in a try-block so memory errors never crash the main chat
+    try:
+        combined = f"User: {user_text}\nAssistant: {assistant_text}"
+        existing_ids = chat_collection.get()['ids']
+        next_id = (max([int(x.split('_')[1]) for x in existing_ids]) + 1) if existing_ids else 1
+        chat_collection.add(
+            embeddings=[embed_text(combined, task_type="document")],
+            documents=[combined],
+            metadatas=[{"type": "conversation_turn"}],
+            ids=[f"turn_{next_id}"]
+        )
+    except Exception as e:
+        print(f"⚠️ Memory save failed: {e}")
 
-# === NEW: RETRIEVE FROM SPECIFIC SUBJECT ===
+# 5. RETRIEVAL & RAG
 def retrieve_book_rag(query: str, subject: str, n_results=3):
     print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
-    
     collection = get_subject_collection(subject)
     if not collection or collection.count() == 0:
-        print(f"⚠️ Warning: '{subject}' database is empty or missing.")
         return []
     
     query_embed = embed_text(query, task_type="query")
@@ -393,10 +542,11 @@ def retrieve_book_rag(query: str, subject: str, n_results=3):
     )
     
     relevant = []
-    if results['documents']:
+    if results['documents'] and results['documents'][0]:
         for i in range(len(results['documents'][0])):
             dist = results['distances'][0][i]
-            if dist < 0.85: # Cosine threshold
+            # Threshold: 0.85 is good for nomic-embed
+            if dist < 0.85: 
                 relevant.append({
                     "text": results['documents'][0][i],
                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
@@ -405,12 +555,7 @@ def retrieve_book_rag(query: str, subject: str, n_results=3):
     return relevant
 
 def build_rag_context(user_query: str, subject: str = "rtl"):
-    # 1. Rewrite Query
-    search_query = contextualize_query(user_query)
-    
-    # 2. Search TARGET Subject DB
-    book_res = retrieve_book_rag(search_query, subject)
-    
+    book_res = retrieve_book_rag(user_query, subject)
     context = []
     if book_res:
         txt = "\n\n".join([f"[Source: {x['id']}] {x['text']}" for x in book_res])
