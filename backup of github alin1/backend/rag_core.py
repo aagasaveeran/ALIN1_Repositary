@@ -435,6 +435,153 @@
 
 ############# DOWN CODE IS   contexualizing and history chat reading is removed and going to be optimized hopefully in the code below. in case of fire , the up code is best to use for now. #############
 
+# import chromadb
+# from pathlib import Path
+# from ollama import Client
+
+# # 1. EXPLICIT CLIENT & CONFIG
+# ollama_client = Client(host='http://127.0.0.1:11434') 
+
+# # Ensure this matches your download: qwen3:4b-instruct
+# MODEL_NAME = "qwen3:4b-instruct"
+# EMBEDDING_MODEL = "nomic-embed-text:latest"
+
+# # 2. DATABASE PATHS
+# DB_ROOT = Path("subject_dbs")
+# DB_MAP = {
+#     "rtl": DB_ROOT / "rtl_db",
+#     "python": DB_ROOT / "python_db",
+#     "maths": DB_ROOT / "maths_db",
+#     "english": DB_ROOT / "english_db"
+# }
+
+# CHROMA_CHAT_PATH = Path("chroma_memory_db")
+
+# # Global clients to prevent "re-opening" the DB on every message
+# chat_client = chromadb.PersistentClient(path=str(CHROMA_CHAT_PATH))
+# _subject_clients = {} 
+
+# def get_subject_collection(subject: str):
+#     if subject not in DB_MAP:
+#         return None
+        
+#     if subject not in _subject_clients:
+#         db_path = DB_MAP[subject]
+#         if not db_path.exists():
+#             db_path.mkdir(parents=True, exist_ok=True)
+#         _subject_clients[subject] = chromadb.PersistentClient(path=str(db_path))
+
+#     client = _subject_clients[subject]
+#     try:
+#         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+#     except Exception as e:
+#         print(f"⚠️ Error loading {subject} DB: {e}")
+#         return None
+
+# # --- 🚀 CRITICAL SPEED UPDATE ---
+# def embed_text(text: str, task_type: str = "document"):
+#     """Uses all 8 CPU threads to make database searching instant."""
+#     if "nomic" in EMBEDDING_MODEL:
+#         prefix = "search_query: " if task_type == "query" else "search_document: "
+#         if not text.startswith(prefix):
+#             text = prefix + text
+    
+#     # We add options here so the CPU doesn't 'lazy-load' the embeddings
+#     response = ollama_client.embeddings(
+#         model=EMBEDDING_MODEL, 
+#         prompt=text,
+#         options={"num_thread": 8} # <--- Force CPU power here too
+#     )
+#     return response['embedding']
+
+# # 4. MEMORY & HISTORY UTILS
+# def get_or_create_chat_collection():
+#     return chat_client.get_or_create_collection(name="chat_memory", metadata={"hnsw:space": "cosine"})
+
+# chat_collection = get_or_create_chat_collection()
+
+# def get_recent_history(n_turns=2):
+#     try:
+#         all_data = chat_collection.get()
+#         ids = all_data['ids']
+#         if not ids: return []
+#         sorted_ids = sorted(ids, key=lambda x: int(x.split('_')[1]))
+#         recent_ids = sorted_ids[-n_turns:]
+#         recent_data = chat_collection.get(ids=recent_ids)
+#         id_doc_map = {id_: doc for id_, doc in zip(recent_data['ids'], recent_data['documents'])}
+#         return [id_doc_map[id_] for id_ in recent_ids]
+#     except: return []
+
+# def add_memory(user_text: str, assistant_text: str):
+#     # We wrap this in a try-block so memory errors never crash the main chat
+#     try:
+#         combined = f"User: {user_text}\nAssistant: {assistant_text}"
+#         existing_ids = chat_collection.get()['ids']
+#         next_id = (max([int(x.split('_')[1]) for x in existing_ids]) + 1) if existing_ids else 1
+#         chat_collection.add(
+#             embeddings=[embed_text(combined, task_type="document")],
+#             documents=[combined],
+#             metadatas=[{"type": "conversation_turn"}],
+#             ids=[f"turn_{next_id}"]
+#         )
+#     except Exception as e:
+#         print(f"⚠️ Memory save failed: {e}")
+
+# # 5. RETRIEVAL & RAG
+# def retrieve_book_rag(query: str, subject: str, n_results=3):
+#     print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
+#     collection = get_subject_collection(subject)
+#     if not collection or collection.count() == 0:
+#         return []
+    
+#     query_embed = embed_text(query, task_type="query")
+#     results = collection.query(
+#         query_embeddings=[query_embed], 
+#         n_results=n_results,
+#         include=["documents", "metadatas", "distances"]
+#     )
+    
+#     relevant = []
+#     if results['documents'] and results['documents'][0]:
+#         for i in range(len(results['documents'][0])):
+#             dist = results['distances'][0][i]
+#             # Threshold: 0.85 is good for nomic-embed
+#             if dist < 0.85: 
+#                 relevant.append({
+#                     "text": results['documents'][0][i],
+#                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
+#                     "score": dist
+#                 })
+#     return relevant
+
+# def build_rag_context(user_query: str, subject: str = "rtl"):
+#     book_res = retrieve_book_rag(user_query, subject)
+#     context = []
+#     if book_res:
+#         txt = "\n\n".join([f"[Source: {x['id']}] {x['text']}" for x in book_res])
+#         context.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
+    
+#     recent_history = get_recent_history(2)
+#     if recent_history:
+#          context.append("💬 RECENT HISTORY:\n" + "\n".join(recent_history))
+        
+#     return ("\n\n".join(context) if context else None), book_res
+
+# def clear_chat_history(confirm_text=None):
+#     if confirm_text == 'YES':
+#         ids = chat_collection.get().get("ids", [])
+#         if ids: chat_collection.delete(ids=ids)
+#         return "✅ Cleared"
+#     return "ℹ️ No action"
+
+
+
+
+######################## up code is before faiss ########################
+
+#######################down code is after faiss #######################
+
+
 import chromadb
 from pathlib import Path
 from ollama import Client
@@ -442,7 +589,6 @@ from ollama import Client
 # 1. EXPLICIT CLIENT & CONFIG
 ollama_client = Client(host='http://127.0.0.1:11434') 
 
-# Ensure this matches your download: qwen3:4b-instruct
 MODEL_NAME = "qwen3:4b-instruct"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
@@ -455,10 +601,6 @@ DB_MAP = {
     "english": DB_ROOT / "english_db"
 }
 
-CHROMA_CHAT_PATH = Path("chroma_memory_db")
-
-# Global clients to prevent "re-opening" the DB on every message
-chat_client = chromadb.PersistentClient(path=str(CHROMA_CHAT_PATH))
 _subject_clients = {} 
 
 def get_subject_collection(subject: str):
@@ -478,7 +620,6 @@ def get_subject_collection(subject: str):
         print(f"⚠️ Error loading {subject} DB: {e}")
         return None
 
-# --- 🚀 CRITICAL SPEED UPDATE ---
 def embed_text(text: str, task_type: str = "document"):
     """Uses all 8 CPU threads to make database searching instant."""
     if "nomic" in EMBEDDING_MODEL:
@@ -486,48 +627,15 @@ def embed_text(text: str, task_type: str = "document"):
         if not text.startswith(prefix):
             text = prefix + text
     
-    # We add options here so the CPU doesn't 'lazy-load' the embeddings
     response = ollama_client.embeddings(
         model=EMBEDDING_MODEL, 
         prompt=text,
-        options={"num_thread": 8} # <--- Force CPU power here too
+        options={"num_thread": 8}
     )
     return response['embedding']
 
-# 4. MEMORY & HISTORY UTILS
-def get_or_create_chat_collection():
-    return chat_client.get_or_create_collection(name="chat_memory", metadata={"hnsw:space": "cosine"})
-
-chat_collection = get_or_create_chat_collection()
-
-def get_recent_history(n_turns=2):
-    try:
-        all_data = chat_collection.get()
-        ids = all_data['ids']
-        if not ids: return []
-        sorted_ids = sorted(ids, key=lambda x: int(x.split('_')[1]))
-        recent_ids = sorted_ids[-n_turns:]
-        recent_data = chat_collection.get(ids=recent_ids)
-        id_doc_map = {id_: doc for id_, doc in zip(recent_data['ids'], recent_data['documents'])}
-        return [id_doc_map[id_] for id_ in recent_ids]
-    except: return []
-
-def add_memory(user_text: str, assistant_text: str):
-    # We wrap this in a try-block so memory errors never crash the main chat
-    try:
-        combined = f"User: {user_text}\nAssistant: {assistant_text}"
-        existing_ids = chat_collection.get()['ids']
-        next_id = (max([int(x.split('_')[1]) for x in existing_ids]) + 1) if existing_ids else 1
-        chat_collection.add(
-            embeddings=[embed_text(combined, task_type="document")],
-            documents=[combined],
-            metadatas=[{"type": "conversation_turn"}],
-            ids=[f"turn_{next_id}"]
-        )
-    except Exception as e:
-        print(f"⚠️ Memory save failed: {e}")
-
-# 5. RETRIEVAL & RAG
+# 3. RETRIEVAL LOGIC
+# --- 🚀 UPDATED RETRIEVAL LOGIC ---
 def retrieve_book_rag(query: str, subject: str, n_results=3):
     print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
     collection = get_subject_collection(subject)
@@ -545,31 +653,42 @@ def retrieve_book_rag(query: str, subject: str, n_results=3):
     if results['documents'] and results['documents'][0]:
         for i in range(len(results['documents'][0])):
             dist = results['distances'][0][i]
-            # Threshold: 0.85 is good for nomic-embed
+            
+            # --- 💡 LOOSENED FILTER: 0.80 -> 0.85 ---
+            # This allows more "specific" matches (like names) to pass through.
             if dist < 0.85: 
                 relevant.append({
                     "text": results['documents'][0][i],
                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
+                    "topic": results['metadatas'][0][i].get("topic", "Reference"),
                     "score": dist
                 })
     return relevant
 
-def build_rag_context(user_query: str, subject: str = "rtl"):
+# 4. CONTEXT BUILDING (The "Never Lose Context" Engine)
+def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl"):
+    """
+    Combines Retrieval Augmented Generation with real-time Chat History.
+    chat_history expected format: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+    """
+    # 1. Get Textbook Material
     book_res = retrieve_book_rag(user_query, subject)
-    context = []
-    if book_res:
-        txt = "\n\n".join([f"[Source: {x['id']}] {x['text']}" for x in book_res])
-        context.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
     
-    recent_history = get_recent_history(2)
-    if recent_history:
-         context.append("💬 RECENT HISTORY:\n" + "\n".join(recent_history))
+    context_parts = []
+    
+    if book_res:
+        txt = "\n\n".join([f"[Source: {x['topic']}] {x['text']}" for x in book_res])
+        context_parts.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
+    
+    # 2. Format Chat History (Sliding Window: Last 5 turns)
+    if chat_history:
+        history_text = ""
+        for turn in chat_history[-5:]: # Keep it light, keep it fast
+            role = "Student" if turn['role'] == 'user' else "ALIN1"
+            history_text += f"{role}: {turn['content']}\n"
         
-    return ("\n\n".join(context) if context else None), book_res
-
-def clear_chat_history(confirm_text=None):
-    if confirm_text == 'YES':
-        ids = chat_collection.get().get("ids", [])
-        if ids: chat_collection.delete(ids=ids)
-        return "✅ Cleared"
-    return "ℹ️ No action"
+        context_parts.append("💬 RECENT CONVERSATION LOG:\n" + history_text)
+        
+    final_context = "\n\n".join(context_parts) if context_parts else None
+    
+    return final_context, book_res

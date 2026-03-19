@@ -440,29 +440,140 @@
 
 #################### below is metadata and first line the topic vise####################
 
+# import os
+# from pathlib import Path
+# import chromadb
+# import uuid
+# # Import our database map and embedding logic from your rag_core
+# from rag_core import embed_text, DB_MAP
+
+# # Define where you will drop your raw text files
+# SOURCE_DIR = Path("source_documents")
+
+# def advanced_chunk_text(text, chunk_size=1000, overlap=200):
+#     """
+#     Creates overlapping chunks so Qwen doesn't lose context at the edges.
+#     """
+#     chunks = []
+#     for i in range(0, len(text), chunk_size - overlap):
+#         chunk = text[i : i + chunk_size].strip()
+#         if chunk:
+#             chunks.append(chunk)
+#     return chunks
+
+# def process_all_subjects():
+#     print("🚀 ALIN1 SYSTEM: Deep Learning Ingestion Started (with Topic Extraction)\n")
+    
+#     SOURCE_DIR.mkdir(exist_ok=True)
+    
+#     for subject, db_path in DB_MAP.items():
+#         subject_folder = SOURCE_DIR / subject
+#         subject_folder.mkdir(exist_ok=True)
+        
+#         txt_files = list(subject_folder.glob("*.txt"))
+        
+#         if not txt_files:
+#             print(f"⏭️  SKIPPING {subject.upper()}: No .txt files in '{subject_folder}'")
+#             continue
+            
+#         print(f"📚 TEACHING ALIN1: {subject.upper()}")
+        
+#         db_path.mkdir(parents=True, exist_ok=True)
+#         client = chromadb.PersistentClient(path=str(db_path))
+        
+#         try:
+#             client.delete_collection("book_content")
+#         except:
+#             pass
+            
+#         collection = client.create_collection(
+#             name="book_content", 
+#             metadata={"hnsw:space": "cosine"}
+#         )
+        
+#         total_chunks_for_subject = 0
+        
+#         for file_path in txt_files:
+#             print(f"   📄 Reading: {file_path.name}")
+#             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+#                 text = f.read()
+                
+#             chunks = advanced_chunk_text(text, chunk_size=1000, overlap=200)
+            
+#             if not chunks: continue
+                
+#             for i, chunk in enumerate(chunks):
+#                 unique_id = f"{file_path.stem}_{uuid.uuid4().hex[:8]}"
+                
+#                 # --- 🚀 NEW: TOPIC EXTRACTION LOGIC ---
+#                 # Look at the first line. If it contains brackets, treat it as the Topic.
+#                 lines = chunk.split('\n')
+#                 first_line = lines[0].strip()
+#                 topic_label = first_line.replace('[', '').replace(']', '') if '[' in first_line else "General Reference"
+                
+#                 try:
+#                     vector = embed_text(chunk, task_type="document")
+                    
+#                     collection.add(
+#                         ids=[unique_id],
+#                         embeddings=[vector],
+#                         documents=[chunk],
+#                         metadatas=[{
+#                             "chunk_id": f"Section {total_chunks_for_subject}", 
+#                             "source": file_path.name, 
+#                             "subject": subject,
+#                             "topic": topic_label # <--- Now storing the clean Topic name
+#                         }]
+#                     )
+#                     total_chunks_for_subject += 1
+#                     if total_chunks_for_subject % 10 == 0:
+#                         print(f"      - Processed {total_chunks_for_subject} chunks...", end='\r')
+#                 except Exception as e:
+#                     print(f"\n❌ Embedding Error: {e}")
+                    
+#         print(f"\n   ✅ {subject.upper()} COMPLETE! {total_chunks_for_subject} chunks indexed.\n")
+
+# if __name__ == "__main__":
+#     process_all_subjects()
+
+
+
+
+
+######### lower is for ffaiss ########
+
+
 import os
 from pathlib import Path
 import chromadb
 import uuid
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
 # Import our database map and embedding logic from your rag_core
 from rag_core import embed_text, DB_MAP
 
 # Define where you will drop your raw text files
 SOURCE_DIR = Path("source_documents")
 
-def advanced_chunk_text(text, chunk_size=1000, overlap=200):
+# --- 🚀 NEW: SMART SEMANTIC SPLITTING ---
+def smart_chunk_text(text, chunk_size=1000, overlap=200):
     """
-    Creates overlapping chunks so Qwen doesn't lose context at the edges.
+    Uses LangChain to split text semantically (by paragraphs, then sentences).
+    This stops the LLM from receiving cut-off sentences, killing hallucinations.
     """
-    chunks = []
-    for i in range(0, len(text), chunk_size - overlap):
-        chunk = text[i : i + chunk_size].strip()
-        if chunk:
-            chunks.append(chunk)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        length_function=len,
+        separators=["\n\n", "\n", " ", ""] # Tries to split on paragraphs first
+    )
+    # The splitter returns Document objects or strings depending on how it's called.
+    # We just want the raw strings here to fit your existing pipeline.
+    chunks = splitter.split_text(text)
     return chunks
 
 def process_all_subjects():
-    print("🚀 ALIN1 SYSTEM: Deep Learning Ingestion Started (with Topic Extraction)\n")
+    print("🚀 ALIN1 SYSTEM: Deep Learning Ingestion Started (with Smart Chunking)\n")
     
     SOURCE_DIR.mkdir(exist_ok=True)
     
@@ -470,6 +581,7 @@ def process_all_subjects():
         subject_folder = SOURCE_DIR / subject
         subject_folder.mkdir(exist_ok=True)
         
+        # This automatically finds all text files in the subject's directory
         txt_files = list(subject_folder.glob("*.txt"))
         
         if not txt_files:
@@ -498,14 +610,14 @@ def process_all_subjects():
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 text = f.read()
                 
-            chunks = advanced_chunk_text(text, chunk_size=1000, overlap=200)
+            # --- 🚀 NEW: Using the smart chunker ---
+            chunks = smart_chunk_text(text, chunk_size=1000, overlap=200)
             
             if not chunks: continue
                 
             for i, chunk in enumerate(chunks):
                 unique_id = f"{file_path.stem}_{uuid.uuid4().hex[:8]}"
                 
-                # --- 🚀 NEW: TOPIC EXTRACTION LOGIC ---
                 # Look at the first line. If it contains brackets, treat it as the Topic.
                 lines = chunk.split('\n')
                 first_line = lines[0].strip()
@@ -522,7 +634,7 @@ def process_all_subjects():
                             "chunk_id": f"Section {total_chunks_for_subject}", 
                             "source": file_path.name, 
                             "subject": subject,
-                            "topic": topic_label # <--- Now storing the clean Topic name
+                            "topic": topic_label 
                         }]
                     )
                     total_chunks_for_subject += 1

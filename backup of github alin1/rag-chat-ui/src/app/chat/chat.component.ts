@@ -1,77 +1,8 @@
 import { Component, OnInit, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Injectable, NgZone } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 import { MarkdownModule } from 'ngx-markdown';
-
-export interface StreamResponse {
-  type: 'token' | 'sources' | 'error' | 'done';
-  value?: any;
-}
-
-// --- 🚀 UPDATED INTERFACE ---
-export interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  // Changed from string[] to any[] to support {id: string, topic: string}
-  sources?: any[]; 
-  timestamp: Date;
-  thinkTime?: number; 
-  totalTime?: number; 
-}
-
-@Injectable({
-  providedIn: 'root'
-})
-export class ChatService {
-  private apiUrl = 'http://localhost:8000';
-
-  constructor(private http: HttpClient, private zone: NgZone) {}
-
-  streamChat(message: string, subject: string): Observable<StreamResponse> {
-    return new Observable((observer) => {
-      const url = `${this.apiUrl}/chat/stream?message=${encodeURIComponent(message)}&subject=${encodeURIComponent(subject)}`;
-      const eventSource = new EventSource(url);
-
-      eventSource.onmessage = (event) => {
-        this.zone.run(() => {
-          const data = JSON.parse(event.data);
-          if (data.sources) {
-            observer.next({ type: 'sources', value: data.sources });
-          } else if (data.token) {
-            observer.next({ type: 'token', value: data.token });
-          } else if (data.done) {
-            observer.next({ type: 'done' });
-            observer.complete();
-            eventSource.close();
-          } else if (data.error) {
-            observer.next({ type: 'error', value: data.error });
-            observer.complete();
-            eventSource.close();
-          }
-        });
-      };
-
-      eventSource.onerror = (error) => {
-        this.zone.run(() => {
-          observer.next({ type: 'error', value: 'Connection lost or server error.' });
-          observer.complete();
-          eventSource.close();
-        });
-      };
-
-      return () => {
-        eventSource.close();
-      };
-    });
-  }
-
-  clearMemory(): Observable<any> {
-    return this.http.post(`${this.apiUrl}/clear`, {});
-  }
-}
+import { ChatService, ChatMessage, StreamResponse } from '../services/chat.service';
 
 @Component({
   selector: 'app-chat',
@@ -86,7 +17,9 @@ export class ChatComponent implements OnInit {
   selectedSubject: string = 'rtl';
   isLoading: boolean = false;
   isStreaming: boolean = false;
-  subjects: string[] = ['general', 'english', 'maths', 'python', 'rtl'];
+  
+  // Updated to match your backend DB_MAP
+  subjects: string[] = ['rtl', 'python', 'maths', 'english'];
 
   timerInterval: any; 
 
@@ -97,17 +30,24 @@ export class ChatComponent implements OnInit {
   sendMessage() {
     if (!this.userInput.trim() || this.isStreaming) return;
 
+    // 1. Capture user message
     const userMsg: ChatMessage = {
       role: 'user',
       content: this.userInput,
       timestamp: new Date()
     };
+    
+    // 2. Clone the history BEFORE adding the current message 
+    // (The backend usually wants the history leading up to the prompt)
+    const historyContext = [...this.messages];
+
     this.messages.push(userMsg);
     
     const messageToSend = this.userInput;
     this.userInput = '';
     this.isStreaming = true;
 
+    // 3. Prepare placeholder for Assistant
     const assistantMsg: ChatMessage = {
       role: 'assistant',
       content: '',
@@ -121,6 +61,7 @@ export class ChatComponent implements OnInit {
     const startTime = Date.now();
     let hasCalculatedTime = false; 
 
+    // 4. Start Metrics Timer
     this.timerInterval = setInterval(() => {
       const elapsed = (Date.now() - startTime) / 1000;
       assistantMsg.totalTime = elapsed; 
@@ -131,8 +72,10 @@ export class ChatComponent implements OnInit {
       this.cd.detectChanges(); 
     }, 100);
 
-    this.chatService.streamChat(messageToSend, this.selectedSubject).subscribe({
+    // 5. Call Service with the new History Parameter
+    this.chatService.streamChat(messageToSend, this.selectedSubject, historyContext).subscribe({
       next: (res: StreamResponse) => {
+        // Stop "Thinking" metric when the first real token arrives
         if (!hasCalculatedTime && res.type === 'token' && res.value) {
           hasCalculatedTime = true;
         }
@@ -142,25 +85,35 @@ export class ChatComponent implements OnInit {
         } else if (res.type === 'token') {
           assistantMsg.content += res.value;
         } else if (res.type === 'error') {
-          assistantMsg.content = `Error: ${res.value}`;
+          assistantMsg.content = `⚠️ Connection Error: ${res.value}`;
         }
         this.cd.detectChanges();
       },
       error: (err) => {
-        clearInterval(this.timerInterval);
+        this.stopTimer();
+        assistantMsg.content = "❌ The server connection was lost.";
         this.isStreaming = false;
         this.cd.detectChanges();
       },
       complete: () => {
-        clearInterval(this.timerInterval);
+        this.stopTimer();
         this.isStreaming = false;
         this.cd.detectChanges();
       }
     });
   }
 
+  private stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+  }
+
   clearChat(): void {
     this.messages = [];
-    this.chatService.clearMemory().subscribe();
+    this.chatService.clearMemory().subscribe({
+      next: () => console.log("Session reset on backend"),
+      error: (err) => console.error("Clear failed", err)
+    });
   }
 }
