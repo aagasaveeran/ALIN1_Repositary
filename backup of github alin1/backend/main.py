@@ -1052,6 +1052,7 @@ OLLAMA_OPTIONS = {
     "temperature": 0.1, # Zero tolerance for hallucinations
     "num_ctx": 4096,
     "top_p": 0.9,
+    "keep_alive": "24h"
 }
 
 # # --- 🚀 PROFESSOR UPGRADE: THE BEHAVIORAL CAGE ---
