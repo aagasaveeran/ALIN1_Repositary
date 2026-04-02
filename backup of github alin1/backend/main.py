@@ -1013,11 +1013,10 @@
 ######################### up is the before faiss ##########################
 ############################### and down is the version with faiss#########################
 
-
-
 import os
 import json
 import uvicorn
+import asyncio
 from fastapi import FastAPI, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
@@ -1027,7 +1026,7 @@ from typing import List, Dict
 # 1. FORCE LOCALHOST
 os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
 
-# Import updated logic from rag_core
+# Import logic from rag_core
 from rag_core import (
     build_rag_context,
     MODEL_NAME,
@@ -1046,55 +1045,14 @@ app.add_middleware(
 
 ollama_client = Client(host='http://127.0.0.1:11434')
 
-# --- 🚀 PROFESSOR UPGRADE: ZERO TEMPERATURE ---
+# --- 🚀 PERFORMANCE & BEHAVIOR SETTINGS ---
 OLLAMA_OPTIONS = {
     "num_thread": 8,
-    "temperature": 0.1, # Zero tolerance for hallucinations
+    "temperature": 0.1, 
     "num_ctx": 4096,
     "top_p": 0.9,
-    "keep_alive": "24h"
+    "keep_alive": "24h" # Fixes slow first response by keeping model in VRAM
 }
-
-# # --- 🚀 PROFESSOR UPGRADE: THE BEHAVIORAL CAGE ---
-# BASE_SYSTEM_PROMPT = """
-# You are ALIN1, a specialized AI Tutor. 
-# STRICT RULES:
-# 1. Use ONLY the 'TEXTBOOK MATERIAL' provided below to answer.
-# 2. If the answer is not in the material, say: "I'm sorry, I couldn't find that in the textbook material. Could you rephrase or ask about something else?"
-# 3. Do NOT use outside knowledge or make up facts.
-# 4. Keep the conversation flow using the 'RECENT CONVERSATION LOG'.
-# """
-
-# SUBJECT_PROMPTS = {
-#     "rtl": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Coach for Radical Transformational Leadership.",
-#     "python": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Senior Python Programming Instructor.",
-#     "maths": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Mathematics Professor.",
-#     "english": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Literature and Grammar Expert."
-# }
-
-
-# BASE_SYSTEM_PROMPT = """
-# You are ALIN1, a specialized AI Tutor. 
-
-# STRICT OPERATING RULES:
-# 1. SOURCE ADHERENCE: Use ONLY the 'TEXTBOOK MATERIAL' provided below. If information is missing, say: "I'm sorry, I couldn't find that in the textbook material. Could you rephrase or ask about something else?"
-# 2. PERSONA INTEGRITY: Speak from the specific 'Persona' assigned, maintaining its tone and expertise.
-# 3. DYNAMIC RECOGNITION: Identify any practitioners, experts, or individuals mentioned in the 'TEXTBOOK MATERIAL'. Treat them as relevant peers or mentors. Reference their stories and insights naturally to provide context, but do not invent details about them outside the text.
-# 4. CONTEXT: Maintain flow using the 'RECENT CONVERSATION LOG'.
-# 5. NO OUTSIDE KNOWLEDGE: Do not use external facts, even if you know them.
-# """
-
-# # The Persona descriptions are now designed to "invite" the inclusion of people 
-# # found in the source text without explicitly naming them here.
-# SUBJECT_PROMPTS = {
-#     "rtl": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Coach for Radical Transformational Leadership. You are deeply familiar with the practitioners and case studies in the text. Reference the experiences of the leaders and mentors mentioned in the material to ground your coaching.",
-    
-#     "python": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Senior Python Programming Instructor. If the text mentions specific developers or researchers, cite their methodologies as best practices.",
-    
-#     "maths": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Mathematics Professor. Connect formulas to any real-world applications or individuals described in the source material.",
-    
-#     "english": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Literature and Grammar Expert. Analyze the voices and narratives of the people featured in the text through a linguistic and structural lens."
-# }
 
 BASE_SYSTEM_PROMPT = """
 You are ALIN1, a specialized AI Tutor. 
@@ -1108,11 +1066,8 @@ STRICT OPERATING RULES:
 
 SUBJECT_PROMPTS = {
     "rtl": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Coach for Radical Transformational Leadership. You are a peer to the practitioners in the text. Reference the individuals and their specific 'Breakthrough Initiatives' found in the material to guide the user.",
-    
     "python": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Senior Python Programming Instructor. Reference any specific developers or innovators found in the text as pioneers of the methodologies you teach.",
-    
     "maths": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Mathematics Professor. Relate formulas to the stories and people in the text who use them for real-world impact.",
-    
     "english": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Literature and Grammar Expert. Use the personal narratives and names in the text as primary examples for linguistic analysis."
 }
 
@@ -1120,12 +1075,11 @@ SUBJECT_PROMPTS = {
 def get_books():
     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
 
-# --- 🚀 UPDATED: Accepting History in the Stream ---
 @app.post("/chat/stream")
 async def stream_chat(
     message: str = Query(...), 
     subject: str = Query("rtl"),
-    history: List[Dict] = Body([]) # Receive the last few messages from Frontend
+    history: List[Dict] = Body([]) 
 ):
     if subject not in DB_MAP:
         subject = "rtl"
@@ -1134,22 +1088,26 @@ async def stream_chat(
         yield json.dumps({"token": ""})
 
         try:
-            # 1. Retrieval using the new History-Aware function
-            rag_context, sources = build_rag_context(message, history, subject=subject)
+            # 1. ASYNC RETRIEVAL: Prevents blocking the event loop
+            loop = asyncio.get_event_loop()
+            rag_context, sources = await loop.run_in_executor(
+                None, lambda: build_rag_context(message, history, subject=subject)
+            )
             
             if sources:
                 source_data = [{"id": str(s['id']), "topic": s.get('topic', 'Reference')} for s in sources]
                 yield json.dumps({"sources": source_data})
             
-            # 2. Build the "Caged" Prompt
+            # 2. Build Prompt with History Injection
             base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
             if rag_context:
-                system_content = f"{base_persona}\n\n--- RAG DATA ---\n{rag_context}"
+                system_content = f"{base_persona}\n\n--- TEXTBOOK MATERIAL (RAG) ---\n{rag_context}"
             else:
                 system_content = f"{base_persona}\nStrictly say: 'No relevant material found for {subject.upper()}.'"
 
             messages = [
                 {"role": "system", "content": system_content},
+                *history, # Unpacks previous messages for context retention
                 {"role": "user", "content": message}
             ]
             
@@ -1183,7 +1141,6 @@ async def stream_chat(
 
 @app.post("/clear")
 async def clear_memory():
-    # Memory is now handled on the frontend session, so we just return success
     return {"status": "Frontend session cleared"}
 
 if __name__ == "__main__":
