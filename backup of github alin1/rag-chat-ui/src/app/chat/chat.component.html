@@ -1,3 +1,12 @@
+<!-- <div class="subject-selector">
+  <label for="subjectSelect">Choose Subject Database: </label>
+  <select id="subjectSelect" [(ngModel)]="selectedSubject">
+    <option value="rtl">RTL (Indian Culture)</option>
+    <option value="python">Python Programming</option>
+    <option value="maths">Mathematics</option>
+    <option value="english">English Literature</option>
+  </select>
+</div>
 <div class="chat-wrapper">
   <div class="header">
     <h2>ALIN1 Tutor</h2>
@@ -36,5 +45,222 @@
     <button (click)="sendMessage()" [disabled]="isStreaming || !userInput.trim()">
       Send
     </button>
+  </div>
+</div> -->
+
+
+<!-- 
+
+ <div class="glass-wrapper">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="glass-container">
+    
+    <div class="glass-header">
+      <div class="header-title">
+        <h2>✨ ALIN1 Tutor</h2>
+      </div>
+      
+      <div class="header-controls">
+        <select id="subjectSelect" class="glass-select" [(ngModel)]="selectedSubject">
+          <option value="rtl">RTL (Indian Culture)</option>
+          <option value="python">Python Programming</option>
+          <option value="maths">Mathematics</option>
+          <option value="english">English Literature</option>
+        </select>
+        <button class="glass-btn clear-btn" (click)="clearChat()">Clear</button>
+      </div>
+    </div>
+
+    <div class="chat-window" #scrollContainer>
+      <div *ngFor="let msg of messages" class="message-wrapper" [ngClass]="{'user-wrapper': msg.role === 'user', 'ai-wrapper': msg.role === 'assistant'}">
+        
+        <div class="message-bubble glass-panel" [ngClass]="msg.role">
+          <div class="sender-name">{{ msg.role === 'user' ? 'YOU' : 'ALIN1' }}</div>
+          <markdown [data]="msg.content"></markdown>
+          
+          <div class="sources-container" *ngIf="msg.sources && msg.sources.length > 0">
+            <span class="source-chip" *ngFor="let source of msg.sources">
+              📘 {{ source }}
+            </span>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="typing-indicator" *ngIf="isStreaming">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+    </div>
+
+    <div class="glass-input-area">
+      <input 
+        type="text" 
+        class="glass-input" 
+        [(ngModel)]="userInput" 
+        (keyup.enter)="sendMessage()"
+        placeholder="Ask ALIN1 a question..." 
+        [disabled]="isStreaming"
+      />
+      <button class="glass-btn send-btn" (click)="sendMessage()" [disabled]="isStreaming || !userInput.trim()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+        </svg>
+      </button>
+    </div>
+
+  </div>
+</div>
+ -->
+
+ <!-- ************** below is sources with id ************** -->
+ 
+ <!-- <div class="glass-wrapper">
+   <div class="blob blob-1"></div>
+   <div class="blob blob-2"></div>
+   
+   <div class="glass-container">
+     
+     <div class="glass-header">
+       <div class="header-title" style="text-align: center;">
+         <h2>✨ ALIN1 </h2>
+        </div>
+        <div class="header-controls">
+          <select id="subjectSelect" class="glass-select" [(ngModel)]="selectedSubject">
+            <option value="rtl">RTL (Indian Culture)</option>
+            <option value="python">Python Programming</option>
+            <option value="maths">Mathematics</option>
+            <option value="english">English Literature</option>
+          </select>
+          <button class="glass-btn clear-btn" (click)="clearChat()">Clear</button>
+        </div>
+      </div>
+      
+      <div class="chat-window" #scrollContainer>
+        <div *ngFor="let msg of messages; let last = last" class="message-wrapper" [ngClass]="{'user-wrapper': msg.role === 'user', 'ai-wrapper': msg.role === 'assistant'}">
+          
+          <div class="message-bubble glass-panel" [ngClass]="msg.role" [class.streaming-text]="last && isStreaming && msg.role === 'assistant'">
+            
+            <div class="sender-name">
+              {{ msg.role === 'user' ? 'YOU' : 'ALIN1' }}
+              
+              <span *ngIf="msg.thinkTime !== undefined" class="time-badge think-badge">
+                🧠 {{ msg.thinkTime.toFixed(1) }}s
+              </span>
+              <span *ngIf="msg.totalTime !== undefined" class="time-badge total-badge">
+                ⏱ {{ msg.totalTime.toFixed(1) }}s
+              </span>
+            </div>
+            
+            <div class="inline-typing" *ngIf="msg.role === 'assistant' && !msg.content && isStreaming">
+              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+            </div>
+            
+            <markdown [data]="msg.content" *ngIf="msg.content"></markdown>
+            
+            <div class="sources-container" *ngIf="msg.sources && msg.sources.length > 0">
+              <span class="source-chip" *ngFor="let source of msg.sources">
+                📘 {{ source }}
+            </span>
+          </div>
+          
+        </div>
+      </div>
+    </div>
+    
+    <div class="glass-input-area">
+      <input 
+      type="text" 
+      class="glass-input" 
+      [(ngModel)]="userInput" 
+      (keyup.enter)="sendMessage()"
+      placeholder="Ask ALIN1 a question..." 
+      [disabled]="isStreaming"
+      />
+      <button class="glass-btn send-btn" (click)="sendMessage()" [disabled]="isStreaming || !userInput.trim()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+        </svg>
+      </button>
+    </div>
+    
+  </div>
+</div> -->
+
+
+<!-- ************** below is sources with topic name ************** -->
+
+
+
+<div class="glass-wrapper">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="glass-container">
+    
+    <div class="glass-header">
+      <div class="header-title" style="text-align: center;">
+      <h2>✨ ALIN1 </h2>
+      </div>
+      <div class="header-controls">
+        <select id="subjectSelect" class="glass-select" [(ngModel)]="selectedSubject">
+          <option value="rtl">RTL (Indian Culture)</option>
+          <option value="python">Python Programming</option>
+          <option value="maths">Mathematics</option>
+          <option value="english">English Literature</option>
+        </select>
+        <button class="glass-btn clear-btn" (click)="clearChat()">Clear</button>
+      </div>
+    </div>
+
+    <div class="chat-window" #scrollContainer>
+      <div *ngFor="let msg of messages; let last = last" class="message-wrapper" [ngClass]="{'user-wrapper': msg.role === 'user', 'ai-wrapper': msg.role === 'assistant'}">
+        
+        <div class="message-bubble glass-panel" [ngClass]="msg.role" [class.streaming-text]="last && isStreaming && msg.role === 'assistant'">
+          
+          <div class="sender-name">
+            {{ msg.role === 'user' ? 'YOU' : 'ALIN1' }}
+            
+            <span *ngIf="msg.thinkTime !== undefined" class="time-badge think-badge">
+              🧠 {{ msg.thinkTime.toFixed(1) }}s
+            </span>
+            <span *ngIf="msg.totalTime !== undefined" class="time-badge total-badge">
+              ⏱ {{ msg.totalTime.toFixed(1) }}s
+            </span>
+          </div>
+
+          <div class="inline-typing" *ngIf="msg.role === 'assistant' && !msg.content && isStreaming">
+            <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+          </div>
+
+          <markdown [data]="msg.content" *ngIf="msg.content"></markdown>
+          
+          <div class="sources-container" *ngIf="msg.sources && msg.sources.length > 0">
+            <span class="source-chip" *ngFor="let source of msg.sources">
+              📘 {{ source.topic ? source.topic : (source.id ? source.id : source) }}
+            </span>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div class="glass-input-area">
+      <input 
+        type="text" 
+        class="glass-input" 
+        [(ngModel)]="userInput" 
+        (keyup.enter)="sendMessage()"
+        placeholder="Ask ALIN1 a question..." 
+        [disabled]="isStreaming"
+      />
+      <button class="glass-btn send-btn" (click)="sendMessage()" [disabled]="isStreaming || !userInput.trim()">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M15.854.146a.5.5 0 0 1 .11.54l-5.819 14.547a.75.75 0 0 1-1.329.124l-3.178-4.995L.643 7.184a.75.75 0 0 1 .124-1.33L15.314.037a.5.5 0 0 1 .54.11ZM6.636 10.07l2.761 4.338L14.13 2.576 6.636 10.07Zm6.787-8.201L1.591 6.602l4.339 2.76 7.494-7.493Z"/>
+        </svg>
+      </button>
+    </div>
+
   </div>
 </div>

@@ -1,0 +1,47 @@
+Chapter 4: Data Structures – Organizing Data
+Welcome to Collections! Until now, we have stored single pieces of data (like a = 10). But what if you need to store a list of 100 students or a shopping list? You can't create 100 separate variables. Instead, Python gives us four powerful ways to collect data in one place: Lists, Tuples, Sets, and Dictionaries.
+4.1 Lists ( The Flexible Container)
+A List is the most common way to store multiple items. You can add, remove, and change items inside a list anytime. We create lists using square brackets [].
+Creating a List:
+a = [1-5]
+print(a)
+• Accessing Data: Lists use "index positions" starting at 0.
+    ◦ a gives you the first item (1).
+    ◦ a gives you the fifth item (5).
+Modifying Lists (The "Mutable" Nature): You can change the content of a list after you create it.
+1. Adding to the end (append):
+2. Inserting at a specific spot (insert): We can tell Python where to put the new item using the index.
+3. Removing items (pop): You can remove an item by its index number.
+4. Combining lists (extend): If you have two lists, you can merge them.
+4.2 Tuples (The Unchangeable Container)
+A Tuple is very similar to a list, but with one major difference: Once you create it, you cannot change it. This is called being "Immutable." We use parentheses () for tuples.
+Code Example:
+a = (1, 2, 3, 4, 5)
+print(a)
+Why use it? If you try to change a value (like a = 10), Python will give you an error. This is useful when you want to protect data so no one (and no code) accidentally changes it.
+• Analogy: Think of a List like a whiteboard (you can erase and rewrite). Think of a Tuple like a stone tablet (once carved, it stays that way).
+4.3 Sets (No Duplicates Allowed)
+A Set is a collection that does not allow duplicate values. Also, sets are unordered—meaning the items might not appear in the same order you typed them. We use curly braces {}.
+Removing Duplicates: If you try to add the number 1 twice, Python simply ignores the second one.
+Code Example:
+a = {1, 2, 3, 4, 5, 1} 
+print(a)
+• Output: {1, 2, 3, 4, 5} (The extra '1' is gone).
+• Note: You cannot access items in a set using index numbers (like a) because the order keeps changing.
+4.4 Dictionaries (Key-Value Pairs)
+A Dictionary is like a real dictionary. Instead of looking up a word to find a definition, you look up a Key to find a Value. We also use curly braces {}, but with colons :.
+Structure: { "Key": Value }
+Code Example:
+data = {
+    "name": "EMC",
+    "age": 1,
+    "location": "Chennai"
+}
+Accessing Data: You don't use numbers (indexes). You use the keys (the names you gave the data).
+print(data["name"])     # Prints: EMC
+print(data["age"])      # Prints: 1
+Modifying Data: You can easily change values or add new ones.
+data["name"] = "Error Makes Clever" # Changes the name
+data["user"] = "New User"           # Adds a new key called "user"
+
+--------------------------------------------------------------------------------

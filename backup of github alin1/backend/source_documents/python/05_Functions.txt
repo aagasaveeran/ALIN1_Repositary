@@ -1,0 +1,82 @@
+Chapter 5: Functions – Reusable Blocks of Code
+Welcome to Modular Programming! Up until now, we have been writing code that runs from top to bottom. But what if you need to use the same logic (like checking if a number is even) in ten different places? You shouldn't copy-paste the code ten times. Instead, you create a Function.
+A function is a block of code that only runs when you call it. You can think of it like hiring a specialist (e.g., a "Painter"). The painter sits and waits until you specifically tell them, "Come and paint."
+5.1 Defining a Function
+To create a function in Python, we use the keyword def (short for define), followed by a name you choose, parentheses (), and a colon :.
+The Basic Syntax:
+def function_name():
+    # Code to be executed
+    print("Action happened")
+Real-World Analogy: The instructor uses a "Painter" analogy. We define a painter, but they don't do anything until we call them.
+Code Example:
+def painter():
+    print("Painting")
+
+# Calling the function
+painter()
+painter() 
+• Output: Painting Painting
+• Explanation: We defined the instructions under painter. We then "called" the function twice, so the code ran twice.
+5.2 Parameters (Passing Information)
+Sometimes, a function needs specific information to do its job. For example, a calculator needs numbers to add. We pass this information inside the parentheses. These are called Parameters (or Arguments).
+Code Example: A Simple Adder
+def add(a, b):
+    print(a + b)
+
+add(10, 20)
+• Output: 30
+• How it works: When we call add(10, 20), the variable a becomes 10 and b becomes 20 automatically.
+5.3 Practical Example: Even or Odd Checker
+Let's build a useful function that takes a number and tells us if it is Even or Odd.
+Code Example:
+def find_even_or_odd(number):
+    if number % 2 == 0:
+        print("Even")
+    else:
+        print("Odd")
+
+find_even_or_odd(10)
+• Output: Even
+• Why this is useful: Now, whenever you need to check a number in your program, you just write one line: find_even_or_odd(number).
+5.4 The return Keyword
+This is a concept that often confuses beginners. What is the difference between print and return?
+• Print: The function displays the result on the screen, but the program "forgets" the result immediately after.
+• Return: The function gives the result back to the main program so you can store it in a variable and use it later.
+Analogy:
+• Print: You ask your assistant, "What is 2+2?" They shout "4!" (You heard it, but you didn't write it down).
+• Return: You ask your assistant, "What is 2+2?" They write "4" on a piece of paper and hand it to you. Now you can hold onto that paper and use it.
+Code Example:
+def painter():
+    return "I am Painter"
+
+message = painter() # The function returns the text, and we store it in 'message'
+print(message)
+• Output: I am Painter.
+5.5 Mini-Project: Login System
+Let's combine everything we've learnt (Variables, If/Else, and Functions) to create a simple backend login system.
+The Goal: We want a function called validate that checks if the username and password are correct.
+• Correct Username: "EMC"
+• Correct Password: "123"
+Code Example:
+# 1. Get input from the user
+username = input("Enter Username: ")
+password = input("Enter Password: ")
+
+# 2. Define the validation function
+def validate():
+    if username == "EMC" and password == "123":
+        return True
+    else:
+        return False
+
+# 3. Call the function and store the result
+result = validate()
+
+# 4. Give the final message
+if result == True: # You can also just write 'if result:'
+    print("Login Successful")
+else:
+    print("Login Failed")
+• Explanation: The function checks the logic and strictly returns True or False. The main program then decides what to print based on that result.
+
+--------------------------------------------------------------------------------

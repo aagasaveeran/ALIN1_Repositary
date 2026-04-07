@@ -1,0 +1,93 @@
+Chapter 6: Classes and Objects – Blueprinting
+Welcome to Object-Oriented Programming (OOP)! Up to this point, we have been writing code procedurally—just a list of instructions. But in the professional world, we group code into logical blocks called Classes and Objects.
+6.1 The Concept: Class vs. Object
+The instructor uses a very clear analogy to explain this:
+• Class: Think of a blank Application Form (like a railway ticket reservation form). It has spaces for "Name," "Age," and "Train Number," but it is empty. It is just a template.
+• Object: Think of the Filled Form. Once Ramesh fills it out, it becomes Ramesh's ticket. Once Suresh fills it out, it becomes Suresh's ticket.
+• Class: The Blueprint / Template.
+• Object: The actual thing created from the blueprint.
+6.2 Creating Your First Class
+To create a class, we use the class keyword. By convention, class names often start with a Capital letter.
+Code Example:
+class Goa:
+    def party(self):
+        print("Let's party")
+
+    def beach(self):
+        print("Enjoying the beach")
+
+# Creating Objects (Building from the blueprint)
+ramesh = Goa()
+suresh = Goa()
+
+# Using the Objects
+ramesh.party()
+suresh.beach()
+• Output: Let's party Enjoying the beach
+6.3 The Magic of self
+You will notice the word self inside the function brackets: def party(self):.
+• What is it? self refers to the specific object calling the function.
+• Why do we need it? If you have two objects, ramesh and suresh, and you call a function, Python needs to know whose data to use. self tells Python: "Use Ramesh's data for Ramesh" and "Use Suresh's data for Suresh."
+6.4 The Constructor (__init__)
+Imagine buying a new laptop. You don't want to buy an empty shell and then install the RAM and Processor manually later. You want it to come ready with those things.
+In Python, the Constructor is a special function named __init__. It runs automatically the moment you create an object. We use it to set up initial values (like RAM and Price).
+Code Example: Laptop Class
+class Laptop:
+    def __init__(self):
+        self.price = 0
+        self.ram = ""
+        self.processor = ""
+
+    def display(self):
+        print("Price:", self.price)
+        print("RAM:", self.ram)
+        print("Processor:", self.processor)
+
+# Creating an Object
+hp = Laptop()
+
+# Manually assigning values (We will improve this next)
+hp.price = 50000
+hp.ram = "8GB"
+hp.processor = "i5"
+
+hp.display()
+6.5 Passing Values to the Constructor
+Instead of setting values line-by-line (hp.price = ...), we can pass them directly when creating the object. This is much cleaner.
+Code Example: Student Register
+class Student:
+    def __init__(self, name, roll_no):
+        self.name = name        # Storing the input 'name' into the object's storage 'self.name'
+        self.roll_no = roll_no
+
+    def display(self):
+        print("Name:", self.name)
+        print("Roll No:", self.roll_no)
+
+# Creating Objects with data immediately
+s1 = Student("EMC", 101)
+s2 = Student("Ramesh", 102)
+
+s1.display() # Prints: Name: EMC, Roll No: 101
+s2.display() # Prints: Name: Ramesh, Roll No: 102
+6.6 Class Variables vs. Instance Variables
+This is a common interview topic.
+1. Instance Variable: Unique to each object. (e.g., My phone's charger type might be 'C-Type', yours might be 'Micro-USB'). We define these with self.
+2. Class Variable: Shared by all objects. (e.g., If we both have iPhones, the 'Brand' is 'Apple' for both of us). We define these directly inside the class, outside any function.
+Code Example:
+class Phone:
+    charger_type = "C-Type"    # Class Variable (Same for everyone)
+
+    def __init__(self, brand, price):
+        self.brand = brand     # Instance Variable (Unique to this phone)
+        self.price = price     # Instance Variable (Unique to this phone)
+
+    def display(self):
+        print("Brand:", self.brand)
+        print("Price:", self.price)
+        print("Charger:", self.charger_type)
+
+# Changing a Class Variable
+Phone.charger_type = "B-Type" # This changes it for ALL future phones
+
+--------------------------------------------------------------------------------

@@ -1,0 +1,81 @@
+Chapter 7: Inheritance & Polymorphism
+Welcome to Family Trees in Code! In the previous chapter, we learned how to create a single class. But in the real world, things are related. A "Car" is related to a "Vehicle." A "Student" is related to a "Person."
+Inheritance allows a class (Child) to acquire the properties and methods of another class (Parent). This saves us from writing the same code over and over again.
+7.1 Single Inheritance (Dad and Son)
+The instructor uses a classic family analogy:
+• Dad: Has a "Phone".
+• Son: Has a "Laptop".
+• Inheritance: If the Son inherits from the Dad, the Son can use both his own Laptop AND his Dad's Phone.
+Code Example:
+# Parent Class
+class Dad:
+    def phone(self):
+        print("Dad's Phone")
+
+# Child Class (Inherits from Dad)
+class Son(Dad):
+    def laptop(self):
+        print("Son's Laptop")
+
+ram = Son()
+ram.laptop() # He can use his own item
+ram.phone()  # He can also use his Dad's item!
+• Output: Son's Laptop Dad's Phone
+7.2 Types of Inheritance
+Python supports several ways to structure these relationships:
+1. Multiple Inheritance (Mom + Dad -> Son): A child can have more than one parent.
+2. Multi-Level Inheritance (Grandpa -> Dad -> Son): The chain of command.
+3. Hierarchical Inheritance (Dad -> Son 1, Son 2, Son 3): One parent, multiple children. All children share the parent's traits, but not each other's.
+7.3 Polymorphism (Method Overriding)
+"Poly" means many, "Morph" means forms. Sometimes, a child class wants to use a method name from the parent but wants to behave differently. This is called Method Overriding.
+Example: Animals and Sounds Every animal makes a sound, but a Dog's sound is specific.
+class Animal:
+    def sound(self):
+        print("Animal makes a sound")
+
+class Dog(Animal):
+    def sound(self): # We override the parent's method
+        print("Dog barks")
+
+class Bird(Animal):
+    def sound(self):
+        print("Birds sing")
+
+d = Dog()
+d.sound() 
+• Output: Dog barks
+• Why? Even though Animal has a sound method, the Dog class has its own version, which takes priority.
+7.4 The super() Keyword
+What if you want to use the parent's logic and add your own extra logic? You don't want to delete the parent's work; you want to extend it. We use super().
+Code Example:
+class Person:
+    def __init__(self, name):
+        self.name = name
+
+class Student(Person):
+    def __init__(self, name, grade):
+        super().__init__(name) # Call the Parent's constructor to handle the name
+        self.grade = grade     # Handle the grade locally
+
+    def display(self):
+        print(self.name, self.grade)
+
+s = Student("John", "A")
+s.display()
+• Explanation: super().__init__(name) tells Python, "Go to the Person class and run its constructor first."
+7.5 Encapsulation (Private Variables)
+Sometimes you want to keep data safe so it cannot be accessed directly from outside the class. In Python, we use double underscores (__) to make a variable private.
+Code Example:
+class Company:
+    def __init__(self):
+        self.__companyName = "Google" # Private Variable
+
+    def display(self):
+        print(self.__companyName) # We can access it inside the class
+
+c1 = Company()
+c1.display() # This works
+# print(c1.__companyName) # This would crash with an error!
+• The Rule: Private variables can only be touched by methods inside the class itself.
+
+--------------------------------------------------------------------------------

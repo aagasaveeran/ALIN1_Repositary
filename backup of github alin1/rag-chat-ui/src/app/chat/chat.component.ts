@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core'; 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MarkdownModule } from 'ngx-markdown';
@@ -9,81 +9,111 @@ import { ChatService, ChatMessage, StreamResponse } from '../services/chat.servi
   standalone: true,
   imports: [CommonModule, FormsModule, MarkdownModule],
   templateUrl: './chat.component.html',
-  styleUrls: ['./chat.component.css']
+  styleUrl: './chat.component.css'
 })
-export class ChatComponent implements OnInit, AfterViewChecked {
-  @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
-
+export class ChatComponent implements OnInit {
   messages: ChatMessage[] = [];
-  userInput = '';
-  isStreaming = false;
+  userInput: string = '';
+  selectedSubject: string = 'rtl';
+  isLoading: boolean = false;
+  isStreaming: boolean = false;
+  
+  // Updated to match your backend DB_MAP
+  subjects: string[] = ['rtl', 'python', 'maths', 'english'];
 
-  constructor(
-    private chatService: ChatService,
-    private cd: ChangeDetectorRef
-  ) {}
+  timerInterval: any; 
 
-  ngOnInit() {}
+  constructor(private chatService: ChatService, private cd: ChangeDetectorRef) {}
 
-  ngAfterViewChecked() {
-    this.scrollToBottom();
-  }
-
-  scrollToBottom(): void {
-    try {
-      if (this.scrollContainer) {
-        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
-      }
-    } catch (err) {}
-  }
+  ngOnInit(): void {}
 
   sendMessage() {
     if (!this.userInput.trim() || this.isStreaming) return;
 
+    // 1. Capture user message
     const userMsg: ChatMessage = {
       role: 'user',
       content: this.userInput,
       timestamp: new Date()
     };
+    
+    // 2. Clone the history BEFORE adding the current message 
+    // (The backend usually wants the history leading up to the prompt)
+    const historyContext = [...this.messages];
 
     this.messages.push(userMsg);
+    
     const messageToSend = this.userInput;
     this.userInput = '';
     this.isStreaming = true;
 
+    // 3. Prepare placeholder for Assistant
     const assistantMsg: ChatMessage = {
       role: 'assistant',
       content: '',
       sources: [],
-      timestamp: new Date()
+      timestamp: new Date(),
+      thinkTime: 0.0,
+      totalTime: 0.0
     };
     this.messages.push(assistantMsg);
 
-    this.chatService.streamChat(messageToSend).subscribe({
+    const startTime = Date.now();
+    let hasCalculatedTime = false; 
+
+    // 4. Start Metrics Timer
+    this.timerInterval = setInterval(() => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      assistantMsg.totalTime = elapsed; 
+      
+      if (!hasCalculatedTime) {
+        assistantMsg.thinkTime = elapsed; 
+      }
+      this.cd.detectChanges(); 
+    }, 100);
+
+    // 5. Call Service with the new History Parameter
+    this.chatService.streamChat(messageToSend, this.selectedSubject, historyContext).subscribe({
       next: (res: StreamResponse) => {
+        // Stop "Thinking" metric when the first real token arrives
+        if (!hasCalculatedTime && res.type === 'token' && res.value) {
+          hasCalculatedTime = true;
+        }
+
         if (res.type === 'sources') {
           assistantMsg.sources = res.value;
         } else if (res.type === 'token') {
           assistantMsg.content += res.value;
         } else if (res.type === 'error') {
-          assistantMsg.content = `Error: ${res.value}`;
+          assistantMsg.content = `⚠️ Connection Error: ${res.value}`;
         }
         this.cd.detectChanges();
       },
       error: (err) => {
+        this.stopTimer();
+        assistantMsg.content = "❌ The server connection was lost.";
         this.isStreaming = false;
         this.cd.detectChanges();
       },
       complete: () => {
+        this.stopTimer();
         this.isStreaming = false;
         this.cd.detectChanges();
       }
     });
   }
 
-  clearChat() {
-    this.chatService.clearMemory().subscribe(() => {
-      this.messages = [];
+  private stopTimer() {
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
+  }
+
+  clearChat(): void {
+    this.messages = [];
+    this.chatService.clearMemory().subscribe({
+      next: () => console.log("Session reset on backend"),
+      error: (err) => console.error("Clear failed", err)
     });
   }
 }

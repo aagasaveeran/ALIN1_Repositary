@@ -1,0 +1,50 @@
+Chapter 9: File Handling – Reading and Writing
+Welcome to Permanent Storage! Until now, every time we ran our code, the data disappeared as soon as the program finished. If you created a list of students, it was lost when you closed Python. To solve this, we use File Handling to read from and write to external files (like .txt files) on your computer.
+9.1 Opening a File
+To work with a file, we first need to open it using the open() function. This function takes two main arguments:
+1. File Name: The name of the file (e.g., "fruits.txt").
+2. Mode: What we want to do with the file.
+Common Modes:
+• 'r' (Read Only): The default mode. You can only read data; you cannot change it.
+• 'w' (Write): Overwrites everything in the file. If the file doesn't exist, it creates a new one.
+• 'a' (Append): Adds new data to the end of the file without deleting the old data.
+• 'r+' (Read and Write): Allows both reading and writing.
+9.2 Reading from a File ('r')
+Let's say you have a file named fruits.txt on your computer containing the words "Apple" and "Orange".
+Code Example:
+# 1. Open the file in Read mode
+f = open("fruits.txt", "r")
+
+# 2. Read the content and store it in a variable
+content = f.read()
+
+# 3. Print the content
+print(content)
+
+# 4. Close the file (Good practice!)
+f.close()
+• Output: Apple Orange
+9.3 Writing to a File ('w')
+Warning: The 'w' mode is destructive. It deletes everything currently in the file and writes your new text.
+Code Example:
+f = open("fruits.txt", "w")
+
+f.write("Mango") # This replaces "Apple" and "Orange" with "Mango"
+
+f.close()
+• Result: If you open fruits.txt on your computer now, it will only contain "Mango".
+9.4 Appending to a File ('a')
+If you want to keep "Apple" and "Orange" but add "Banana" to the list, use Append mode.
+Code Example:
+f = open("fruits.txt", "a")
+
+f.write("Banana") # Adds Banana to the end
+
+f.close()
+9.5 Common Errors
+1. FileNotFoundError: Trying to read a file that doesn't exist.
+2. UnsupportedOperation: Trying to write to a file that you opened only for reading ('r').
+    ◦ Example: If you do f = open("file.txt", "r") and then try f.write("Hello"), Python will crash because you didn't have permission to write.
+3. ValueError (I/O operation on closed file): Trying to read or write after you have already run f.close().
+
+--------------------------------------------------------------------------------
