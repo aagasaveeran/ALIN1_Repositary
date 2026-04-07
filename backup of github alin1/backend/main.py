@@ -1012,7 +1012,6 @@
 
 ######################### up is the before faiss ##########################
 ############################### and down is the version with faiss#########################
-
 import os
 import json
 import uvicorn
@@ -1020,7 +1019,7 @@ import asyncio
 from fastapi import FastAPI, Query, Body
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
-from ollama import Client
+from ollama import AsyncClient
 from typing import List, Dict
 
 # 1. FORCE LOCALHOST
@@ -1043,7 +1042,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-ollama_client = Client(host='http://127.0.0.1:11434')
+ollama_client = AsyncClient(host='http://127.0.0.1:11434')
 
 # --- 🚀 PERFORMANCE & BEHAVIOR SETTINGS ---
 OLLAMA_OPTIONS = {
@@ -1112,14 +1111,14 @@ async def stream_chat(
             ]
             
             # 3. STREAMING GENERATION
-            stream = ollama_client.chat(
+            stream = await ollama_client.chat(
                 model=MODEL_NAME, 
                 messages=messages, 
                 stream=True,
                 options=OLLAMA_OPTIONS
             )
             
-            for chunk in stream:
+            async for chunk in stream:
                 if 'message' in chunk and 'content' in chunk['message']:
                     token = chunk['message']['content']
                     if token:

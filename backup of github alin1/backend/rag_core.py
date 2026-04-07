@@ -630,7 +630,8 @@ def embed_text(text: str, task_type: str = "document"):
     response = ollama_client.embeddings(
         model=EMBEDDING_MODEL, 
         prompt=text,
-        options={"num_thread": 8}
+        options={"num_thread": 8},
+        keep_alive="24h" # Keeps the embedding model loaded instantly
     )
     return response['embedding']
 
