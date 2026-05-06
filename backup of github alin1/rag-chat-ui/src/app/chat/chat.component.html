@@ -191,8 +191,6 @@
 
 <!-- ************** below is sources with topic name ************** -->
 
-
-
 <div class="glass-wrapper">
   <div class="blob blob-1"></div>
   <div class="blob blob-2"></div>
@@ -244,6 +242,17 @@
 
         </div>
       </div>
+    </div>
+
+    <!-- --- FAQ SUGGESTIONS SECTION --- -->
+    <!-- These only show up when NOT streaming to keep the UI clean -->
+    <div class="faq-container" *ngIf="!isStreaming">
+      <button 
+        *ngFor="let faq of faqs" 
+        class="faq-pill" 
+        (click)="sendFaq(faq)">
+        ⚡ {{ faq }}
+      </button>
     </div>
 
     <div class="glass-input-area">
