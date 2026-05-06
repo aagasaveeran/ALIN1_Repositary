@@ -1150,11 +1150,138 @@
 ################### down code is with poml and also the chit chat is classified ##########################
 
 
+# import os
+# import json
+# import uvicorn
+# import asyncio
+# from fastapi import FastAPI, Query, Body
+# from fastapi.middleware.cors import CORSMiddleware
+# from sse_starlette.sse import EventSourceResponse
+# from ollama import AsyncClient
+# from typing import List, Dict
+
+# # 1. FORCE LOCALHOST
+# os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+
+# # Import updated logic from rag_core
+# from rag_core import (
+#     build_rag_context,
+#     MODEL_NAME,
+#     DB_MAP 
+# )
+
+# app = FastAPI(title="ALIN1 AI Tutor System")
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# # Use AsyncClient for non-blocking streaming
+# ollama_client = AsyncClient(host='http://127.0.0.1:11434')
+
+# # --- 🚀 PERFORMANCE & BEHAVIOR SETTINGS ---
+# OLLAMA_OPTIONS = {
+#     "num_thread": 8,
+#     "temperature": 0.1, 
+#     "num_ctx": 4096,
+#     "top_p": 0.9,
+#     "keep_alive": "24h" # Keeps both LLM and Embedding models in VRAM
+# }
+
+# @app.get("/books")
+# def get_books():
+#     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
+
+# @app.post("/chat/stream")
+# async def stream_chat(
+#     message: str = Query(...), 
+#     subject: str = Query("rtl"),
+#     history: List[Dict] = Body([]) 
+# ):
+#     if subject not in DB_MAP:
+#         subject = "rtl"
+
+#     async def event_generator():
+#         # Initial connection handshake
+#         yield json.dumps({"token": ""})
+
+#         try:
+#             # 1. ASYNC ORCHESTRATION
+#             # This calls Intent Classification -> RAG (if needed) -> POML Assembly
+#             loop = asyncio.get_event_loop()
+#             result = await loop.run_in_executor(None, lambda: build_rag_context(message, history, subject=subject))
+#             print(f"DEBUG: build_rag_context returned {len(result)} values: {result}")
+#             system_prompt, final_context, sources = await loop.run_in_executor(
+#                 None, lambda: build_rag_context(message, history, subject=subject)
+#             )
+            
+#             # 2. Send Sources to UI (if RAG was triggered)
+#             if sources:
+#                 source_data = [{"id": str(s['id']), "topic": s.get('topic', 'Reference')} for s in sources]
+#                 yield json.dumps({"sources": source_data})
+            
+#             # 3. Assemble the Caged Message context
+#             # We combine the POML structure with the retrieved context
+#             if final_context:
+#                 system_content = f"{system_prompt}\n\n{final_context}"
+#             else:
+#                 # This triggers for pure CHAT intent or when no RAG results are found
+#                 system_content = system_prompt
+
+#             messages = [
+#                 {"role": "system", "content": system_content},
+#                 *history, # Keep history in the message list for native context awareness
+#                 {"role": "user", "content": message}
+#             ]
+            
+#             # 4. ASYNC STREAMING GENERATION
+#             stream = await ollama_client.chat(
+#                 model=MODEL_NAME, 
+#                 messages=messages, 
+#                 stream=True,
+#                 options=OLLAMA_OPTIONS
+#             )
+            
+#             async for chunk in stream:
+#                 if 'message' in chunk and 'content' in chunk['message']:
+#                     token = chunk['message']['content']
+#                     if token:
+#                         yield json.dumps({"token": token})
+            
+#             yield json.dumps({"done": True})
+            
+#         except Exception as e:
+#             print(f"Streaming Error: {e}")
+#             yield json.dumps({"error": str(e)})
+
+#     headers = {
+#         "X-Accel-Buffering": "no",
+#         "Cache-Control": "no-cache",
+#         "Connection": "keep-alive",
+#         "Content-Type": "text/event-stream"
+#     }
+
+#     return EventSourceResponse(event_generator(), headers=headers)
+
+# @app.post("/clear")
+# async def clear_memory():
+#     return {"status": "Frontend session cleared"}
+
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+
+######## down code is with killer switch #######
 import os
 import json
 import uvicorn
 import asyncio
-from fastapi import FastAPI, Query, Body
+from fastapi import FastAPI, Query, Body, Request
 from fastapi.middleware.cors import CORSMiddleware
 from sse_starlette.sse import EventSourceResponse
 from ollama import AsyncClient
@@ -1196,8 +1323,10 @@ OLLAMA_OPTIONS = {
 def get_books():
     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
 
+# Added 'request: Request' to detect client disconnection
 @app.post("/chat/stream")
 async def stream_chat(
+    request: Request,
     message: str = Query(...), 
     subject: str = Query("rtl"),
     history: List[Dict] = Body([]) 
@@ -1213,8 +1342,8 @@ async def stream_chat(
             # 1. ASYNC ORCHESTRATION
             # This calls Intent Classification -> RAG (if needed) -> POML Assembly
             loop = asyncio.get_event_loop()
-            result = await loop.run_in_executor(None, lambda: build_rag_context(message, history, subject=subject))
-            print(f"DEBUG: build_rag_context returned {len(result)} values: {result}")
+            
+            # Cleaned up redundant double-call to build_rag_context for faster processing
             system_prompt, final_context, sources = await loop.run_in_executor(
                 None, lambda: build_rag_context(message, history, subject=subject)
             )
@@ -1232,9 +1361,19 @@ async def stream_chat(
                 # This triggers for pure CHAT intent or when no RAG results are found
                 system_content = system_prompt
 
+            # --- THE FIX: SANITIZE ANGULAR HISTORY ---
+            # Strip out timestamps, thinkTime, and sources. Ollama ONLY wants role and content.
+            clean_history = []
+            for msg in history:
+                if "role" in msg and "content" in msg and msg["content"].strip():
+                    clean_history.append({
+                        "role": msg["role"], 
+                        "content": msg["content"]
+                    })
+
             messages = [
                 {"role": "system", "content": system_content},
-                *history, # Keep history in the message list for native context awareness
+                *clean_history, # Use the sanitized history here
                 {"role": "user", "content": message}
             ]
             
@@ -1247,10 +1386,18 @@ async def stream_chat(
             )
             
             async for chunk in stream:
+                # 🛑 THE KILL SWITCH: Check if Angular dropped the connection
+                if await request.is_disconnected():
+                    print("\n🛑 CLIENT DISCONNECTED: Halting Ollama inference immediately to save compute.")
+                    break # Breaking this loop safely kills the local AI generation!
+
                 if 'message' in chunk and 'content' in chunk['message']:
                     token = chunk['message']['content']
                     if token:
                         yield json.dumps({"token": token})
+                
+                # Yield control back to the event loop so FastAPI can check disconnect status
+                await asyncio.sleep(0.001)
             
             yield json.dumps({"done": True})
             

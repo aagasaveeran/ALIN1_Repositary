@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MarkdownModule } from 'ngx-markdown';
 import { ChatService, ChatMessage, StreamResponse } from '../services/chat.service';
+import { Subscription } from 'rxjs'; // <-- IMPORT SUBSCRIPTION
 
 @Component({
   selector: 'app-chat',
@@ -21,7 +22,8 @@ export class ChatComponent implements OnInit {
   // Updated to match your backend DB_MAP
   subjects: string[] = ['rtl', 'python', 'maths', 'english'];
 
-  timerInterval: any; 
+  timerInterval: any;
+  private streamSubscription: Subscription | null = null; // <-- ADD SUBSCRIPTION TRACKER
 
   constructor(private chatService: ChatService, private cd: ChangeDetectorRef) {}
 
@@ -38,7 +40,6 @@ export class ChatComponent implements OnInit {
     };
     
     // 2. Clone the history BEFORE adding the current message 
-    // (The backend usually wants the history leading up to the prompt)
     const historyContext = [...this.messages];
 
     this.messages.push(userMsg);
@@ -72,8 +73,8 @@ export class ChatComponent implements OnInit {
       this.cd.detectChanges(); 
     }, 100);
 
-    // 5. Call Service with the new History Parameter
-    this.chatService.streamChat(messageToSend, this.selectedSubject, historyContext).subscribe({
+    // 5. Call Service and save the Subscription
+    this.streamSubscription = this.chatService.streamChat(messageToSend, this.selectedSubject, historyContext).subscribe({
       next: (res: StreamResponse) => {
         // Stop "Thinking" metric when the first real token arrives
         if (!hasCalculatedTime && res.type === 'token' && res.value) {
@@ -93,14 +94,27 @@ export class ChatComponent implements OnInit {
         this.stopTimer();
         assistantMsg.content = "❌ The server connection was lost.";
         this.isStreaming = false;
+        this.streamSubscription = null;
         this.cd.detectChanges();
       },
       complete: () => {
         this.stopTimer();
         this.isStreaming = false;
+        this.streamSubscription = null;
         this.cd.detectChanges();
       }
     });
+  }
+
+  // <-- ADD STOP GENERATION METHOD -->
+  stopGeneration() {
+    if (this.streamSubscription) {
+      this.streamSubscription.unsubscribe(); // Instantly drops the HTTP connection
+      this.streamSubscription = null;
+    }
+    this.stopTimer();
+    this.isStreaming = false;
+    this.cd.detectChanges();
   }
 
   private stopTimer() {
