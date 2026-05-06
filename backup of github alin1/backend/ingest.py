@@ -553,7 +553,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from rag_core import embed_text, DB_MAP
 
 # Define where you will drop your raw text files
-SOURCE_DIR = Path("source_documents")
+SOURCE_DIR = Path("/home/sama/Documents/GitHub/ALIN1_Repositary/backup of github alin1/backend/source_documents")
 
 # --- 🚀 NEW: SMART SEMANTIC SPLITTING ---
 def smart_chunk_text(text, chunk_size=1000, overlap=200):

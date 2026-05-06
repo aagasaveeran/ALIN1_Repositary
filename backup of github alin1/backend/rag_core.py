@@ -582,17 +582,331 @@
 #######################down code is after faiss #######################
 
 
+# import chromadb
+# from pathlib import Path
+# from ollama import Client
+
+# # 1. EXPLICIT CLIENT & CONFIG
+# ollama_client = Client(host='http://127.0.0.1:11434') 
+
+# MODEL_NAME = "qwen3:4b-instruct"
+# EMBEDDING_MODEL = "nomic-embed-text:latest"
+
+# # 2. DATABASE PATHS
+# DB_ROOT = Path("subject_dbs")
+# DB_MAP = {
+#     "rtl": DB_ROOT / "rtl_db",
+#     "python": DB_ROOT / "python_db",
+#     "maths": DB_ROOT / "maths_db",
+#     "english": DB_ROOT / "english_db"
+# }
+
+# _subject_clients = {} 
+
+# def get_subject_collection(subject: str):
+#     if subject not in DB_MAP:
+#         return None
+        
+#     if subject not in _subject_clients:
+#         db_path = DB_MAP[subject]
+#         if not db_path.exists():
+#             db_path.mkdir(parents=True, exist_ok=True)
+#         _subject_clients[subject] = chromadb.PersistentClient(path=str(db_path))
+
+#     client = _subject_clients[subject]
+#     try:
+#         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+#     except Exception as e:
+#         print(f"⚠️ Error loading {subject} DB: {e}")
+#         return None
+
+# def embed_text(text: str, task_type: str = "document"):
+#     """Uses all 8 CPU threads to make database searching instant."""
+#     if "nomic" in EMBEDDING_MODEL:
+#         prefix = "search_query: " if task_type == "query" else "search_document: "
+#         if not text.startswith(prefix):
+#             text = prefix + text
+    
+#     response = ollama_client.embeddings(
+#         model=EMBEDDING_MODEL, 
+#         prompt=text,
+#         options={"num_thread": 8},
+#         keep_alive="24h" # Keeps the embedding model loaded instantly
+#     )
+#     return response['embedding']
+
+# # 3. RETRIEVAL LOGIC
+# # --- 🚀 UPDATED RETRIEVAL LOGIC ---
+# def retrieve_book_rag(query: str, subject: str, n_results=3):
+#     print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
+#     collection = get_subject_collection(subject)
+#     if not collection or collection.count() == 0:
+#         return []
+    
+#     query_embed = embed_text(query, task_type="query")
+#     results = collection.query(
+#         query_embeddings=[query_embed], 
+#         n_results=n_results,
+#         include=["documents", "metadatas", "distances"]
+#     )
+    
+#     relevant = []
+#     if results['documents'] and results['documents'][0]:
+#         for i in range(len(results['documents'][0])):
+#             dist = results['distances'][0][i]
+            
+#             # --- 💡 LOOSENED FILTER: 0.80 -> 0.85 ---
+#             # This allows more "specific" matches (like names) to pass through.
+#             if dist < 0.85: 
+#                 relevant.append({
+#                     "text": results['documents'][0][i],
+#                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
+#                     "topic": results['metadatas'][0][i].get("topic", "Reference"),
+#                     "score": dist
+#                 })
+#     return relevant
+
+# # 4. CONTEXT BUILDING (The "Never Lose Context" Engine)
+# def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl"):
+#     """
+#     Combines Retrieval Augmented Generation with real-time Chat History.
+#     chat_history expected format: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
+#     """
+#     # 1. Get Textbook Material
+#     book_res = retrieve_book_rag(user_query, subject)
+    
+#     context_parts = []
+    
+#     if book_res:
+#         txt = "\n\n".join([f"[Source: {x['topic']}] {x['text']}" for x in book_res])
+#         context_parts.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
+    
+#     # 2. Format Chat History (Sliding Window: Last 5 turns)
+#     if chat_history:
+#         history_text = ""
+#         for turn in chat_history[-5:]: # Keep it light, keep it fast
+#             role = "Student" if turn['role'] == 'user' else "ALIN1"
+#             history_text += f"{role}: {turn['content']}\n"
+        
+#         context_parts.append("💬 RECENT CONVERSATION LOG:\n" + history_text)
+        
+#     final_context = "\n\n".join(context_parts) if context_parts else None
+    
+#     return final_context, book_res
+
+# def classify_intent(user_query: str) -> str:
+#     """
+#     Quickly determines if the user is seeking textbook knowledge 
+#     or just having a casual conversation.
+#     """
+#     # Simple keyword bypass for ultra-fast response on common greetings
+#     greetings = {"hi", "hello", "hey", "how are you", "who are you", "alin1"}
+#     if user_query.lower().strip().strip('?!.') in greetings:
+#         return "CHAT"
+
+#     # Fast LLM check for more complex intent
+#     prompt = f"Categorize this user query as 'KNOWLEDGE' (if asking about RTL, Python, Math, or specific facts) or 'CHAT' (if small talk/greetings). Query: {user_query}\nCategory:"
+    
+#     response = ollama_client.generate(
+#         model=MODEL_NAME, 
+#         prompt=prompt,
+#         options={"num_predict": 2, "temperature": 0} # Extremely fast, 1-2 tokens only
+#     )
+    
+#     return "KNOWLEDGE" if "KNOWLEDGE" in response['response'].upper() else "CHAT"
+
+
+
+
+
+
+###################### down code is convo classification and intent detection added (chit chat) ######################
+
+
+
+# import chromadb
+# import xml.etree.ElementTree as ET
+# from pathlib import Path
+# from ollama import Client
+# import os
+# print(f"🚀 ALIN1 IS RUNNING RAG_CORE FROM: {os.path.abspath(__file__)}")
+
+# # 1. CLIENT CONFIGURATION
+# ollama_client = Client(host='http://127.0.0.1:11434') 
+
+# MODEL_NAME = "qwen3:4b-instruct"
+# EMBEDDING_MODEL = "nomic-embed-text:latest"
+
+# # 2. DATABASE SETUP
+# DB_ROOT = Path("subject_dbs")
+# DB_MAP = {
+#     "rtl": DB_ROOT / "rtl_db",
+#     "python": DB_ROOT / "python_db",
+#     "maths": DB_ROOT / "maths_db",
+#     "english": DB_ROOT / "english_db"
+# }
+
+# _subject_clients = {} 
+
+# def get_subject_collection(subject: str):
+#     if subject not in DB_MAP:
+#         return None
+        
+#     if subject not in _subject_clients:
+#         db_path = DB_MAP[subject]
+#         db_path.mkdir(parents=True, exist_ok=True)
+#         _subject_clients[subject] = chromadb.PersistentClient(path=str(db_path))
+
+#     client = _subject_clients[subject]
+#     try:
+#         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
+#     except Exception as e:
+#         print(f"⚠️ DB Error: {e}")
+#         return None
+
+# # --- 🚀 PERFORMANCE: INSTANT EMBEDDINGS ---
+# def embed_text(text: str, task_type: str = "document"):
+#     if "nomic" in EMBEDDING_MODEL:
+#         prefix = "search_query: " if task_type == "query" else "search_document: "
+#         if not text.startswith(prefix):
+#             text = prefix + text
+    
+#     response = ollama_client.embeddings(
+#         model=EMBEDDING_MODEL, 
+#         prompt=text,
+#         options={"num_thread": 8},
+#         keep_alive="24h" # Keeps embedding model in VRAM for zero-lag search
+#     )
+#     return response['embedding']
+
+# # --- 🎯 INTENT ROUTER: CHIT-CHAT BYPASS ---
+# def classify_intent(user_query: str) -> str:
+#     """Detects if we need RAG or just a quick chat."""
+#     clean_query = user_query.lower().strip().strip('?!.')
+
+#     # 1. Subject Keywords (Force Knowledge)
+#     knowledge_triggers = ["rtl", "cfsr", "integrity", "karuna", "values", "practitioner", "overwhelm", "what is"]
+#     if any(trigger in clean_query for trigger in knowledge_triggers):
+#         print(f"🔍 DEBUG: INTENT OVERRIDE -> KNOWLEDGE (Keyword Match)")
+#         return "KNOWLEDGE"
+
+#     # 2. Pure Greetings (Force Chat)
+#     greetings = {"hi", "hello", "hey", "how are you", "who are you", "alin1", "thanks", "thank you"}
+#     if clean_query in greetings:
+#         return "CHAT"
+
+#     # 3. Fallback to LLM
+#     prompt = f"Categorize as 'KNOWLEDGE' (syllabus/facts) or 'CHAT' (greeting/small talk). Query: {user_query}\nCategory:"
+#     response = ollama_client.generate(
+#         model=MODEL_NAME, 
+#         prompt=prompt,
+#         options={"num_predict": 2, "temperature": 0} 
+#     )
+#     return "KNOWLEDGE" if "KNOWLEDGE" in response['response'].upper() else "CHAT"
+
+
+# # --- 🧩 POML ASSEMBLER: STRUCTURED PROMPTS ---
+# def get_poml_prompt(subject: str) -> str:
+#     """Assembles the XML-based system prompt from our .poml files using absolute paths."""
+#     try:
+#         # 1. Get the directory where rag_core.py is located
+#         current_dir = Path(__file__).parent.absolute()
+        
+#         # 2. Point to the prompts folder (Assumes it is one level up from backend/)
+#         prompts_dir = current_dir / "prompts"
+        
+#         # 3. Load Base Directives
+#         base_path = prompts_dir / "alin1_base.poml"
+#         base_tree = ET.parse(str(base_path))
+#         directives = ET.tostring(base_tree.find(".//directives"), encoding='unicode')
+
+#         # 4. Load Persona
+#         persona_path = prompts_dir / "personas.poml"
+#         persona_tree = ET.parse(str(persona_path))
+#         persona_node = persona_tree.find(f".//persona[@id='{subject}']")
+#         persona_text = persona_node.text.strip() if persona_node is not None else "You are ALIN1."
+
+#         return f"<poml version='1.0'>\n<system>\n<persona>{persona_text}</persona>\n{directives}\n</system>\n</poml>"
+#     except Exception as e:
+#         print(f"POML Error: {e}")
+#         return "You are ALIN1, a specialized AI Tutor. strictly use textbook material only."
+
+# # --- 📖 RETRIEVAL LOGIC ---
+# def retrieve_book_rag(query: str, subject: str, n_results=3):
+#     collection = get_subject_collection(subject)
+#     if not collection or collection.count() == 0:
+#         return []
+    
+#     query_embed = embed_text(query, task_type="query")
+#     results = collection.query(
+#         query_embeddings=[query_embed], 
+#         n_results=n_results,
+#         include=["documents", "metadatas", "distances"]
+#     )
+    
+#     relevant = []
+#     if results['documents'] and results['documents'][0]:
+#         for i in range(len(results['documents'][0])):
+#             if results['distances'][0][i] < 0.85: # Tuned distance threshold
+#                 relevant.append({
+#                     "text": results['documents'][0][i],
+#                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
+#                     "topic": results['metadatas'][0][i].get("topic", "Reference")
+#                 })
+#     return relevant
+
+# # --- 🧠 CONTEXT ENGINE ---
+# def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl"):
+#     """Orchestrates Intent -> RAG (if needed) -> POML System Prompt."""
+    
+#     # 1. Classify Intent
+#     intent = classify_intent(user_query)
+    
+#     # 2. Conditional Retrieval (Save time if just chatting)
+#     book_res = []
+#     if intent == "KNOWLEDGE":
+#         book_res = retrieve_book_rag(user_query, subject)
+    
+#     # 3. Build context parts
+#     context_parts = []
+#     if book_res:
+#         txt = "\n\n".join([f"[Source: {x['topic']}] {x['text']}" for x in book_res])
+#         context_parts.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n{txt}")
+    
+#     # 4. Handle History (Last 5 turns)
+#     if chat_history:
+#         hist = "\n".join([f"{'Student' if t['role']=='user' else 'ALIN1'}: {t['content']}" for t in chat_history[-5:]])
+#         context_parts.append(f"💬 RECENT CONVERSATION LOG:\n{hist}")
+        
+#     final_context = "\n\n".join(context_parts) if context_parts else None
+    
+#     # 5. Get the POML System Prompt
+#     system_prompt = get_poml_prompt(subject)
+    
+#     return system_prompt, final_context, book_res
+#     return system_prompt, final_context, book_res
+
+
+
+
+
+##### upcode is 05night & 06 morning before touching code
+
+
 import chromadb
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from ollama import Client
+import os
+print(f"🚀 ALIN1 IS RUNNING RAG_CORE FROM: {os.path.abspath(__file__)}")
 
-# 1. EXPLICIT CLIENT & CONFIG
+# 1. CLIENT CONFIGURATION
 ollama_client = Client(host='http://127.0.0.1:11434') 
 
 MODEL_NAME = "qwen3:4b-instruct"
 EMBEDDING_MODEL = "nomic-embed-text:latest"
 
-# 2. DATABASE PATHS
+# 2. DATABASE SETUP
 DB_ROOT = Path("subject_dbs")
 DB_MAP = {
     "rtl": DB_ROOT / "rtl_db",
@@ -609,19 +923,18 @@ def get_subject_collection(subject: str):
         
     if subject not in _subject_clients:
         db_path = DB_MAP[subject]
-        if not db_path.exists():
-            db_path.mkdir(parents=True, exist_ok=True)
+        db_path.mkdir(parents=True, exist_ok=True)
         _subject_clients[subject] = chromadb.PersistentClient(path=str(db_path))
 
     client = _subject_clients[subject]
     try:
         return client.get_or_create_collection(name="book_content", metadata={"hnsw:space": "cosine"})
     except Exception as e:
-        print(f"⚠️ Error loading {subject} DB: {e}")
+        print(f"⚠️ DB Error: {e}")
         return None
 
+# --- 🚀 PERFORMANCE: INSTANT EMBEDDINGS ---
 def embed_text(text: str, task_type: str = "document"):
-    """Uses all 8 CPU threads to make database searching instant."""
     if "nomic" in EMBEDDING_MODEL:
         prefix = "search_query: " if task_type == "query" else "search_document: "
         if not text.startswith(prefix):
@@ -631,14 +944,64 @@ def embed_text(text: str, task_type: str = "document"):
         model=EMBEDDING_MODEL, 
         prompt=text,
         options={"num_thread": 8},
-        keep_alive="24h" # Keeps the embedding model loaded instantly
+        keep_alive="24h" # Keeps embedding model in VRAM for zero-lag search
     )
     return response['embedding']
 
-# 3. RETRIEVAL LOGIC
-# --- 🚀 UPDATED RETRIEVAL LOGIC ---
+# --- 🎯 INTENT ROUTER: CHIT-CHAT BYPASS ---
+def classify_intent(user_query: str) -> str:
+    """Detects if we need RAG or just a quick chat."""
+    clean_query = user_query.lower().strip().strip('?!.')
+
+    # 1. Subject Keywords (Force Knowledge)
+    knowledge_triggers = ["rtl", "cfsr", "integrity", "karuna", "values", "practitioner", "overwhelm", "what is"]
+    if any(trigger in clean_query for trigger in knowledge_triggers):
+        print(f"🔍 DEBUG: INTENT OVERRIDE -> KNOWLEDGE (Keyword Match)")
+        return "KNOWLEDGE"
+
+    # 2. Pure Greetings (Force Chat)
+    greetings = {"hi", "hello", "hey", "how are you", "who are you", "alin1", "thanks", "thank you"}
+    if clean_query in greetings:
+        return "CHAT"
+
+    # 3. Fallback to LLM
+    prompt = f"Categorize as 'KNOWLEDGE' (syllabus/facts) or 'CHAT' (greeting/small talk). Query: {user_query}\nCategory:"
+    response = ollama_client.generate(
+        model=MODEL_NAME, 
+        prompt=prompt,
+        options={"num_predict": 2, "temperature": 0} 
+    )
+    return "KNOWLEDGE" if "KNOWLEDGE" in response['response'].upper() else "CHAT"
+
+
+# --- 🧩 POML ASSEMBLER: STRUCTURED PROMPTS ---
+def get_poml_prompt(subject: str) -> str:
+    """Assembles the XML-based system prompt from our .poml files using absolute paths."""
+    try:
+        # 1. Get the directory where rag_core.py is located
+        current_dir = Path(__file__).parent.absolute()
+        
+        # 2. Point to the prompts folder (Assumes it is one level up from backend/)
+        prompts_dir = current_dir / "prompts"
+        
+        # 3. Load Base Directives
+        base_path = prompts_dir / "alin1_base.poml"
+        base_tree = ET.parse(str(base_path))
+        directives = ET.tostring(base_tree.find(".//directives"), encoding='unicode')
+
+        # 4. Load Persona
+        persona_path = prompts_dir / "personas.poml"
+        persona_tree = ET.parse(str(persona_path))
+        persona_node = persona_tree.find(f".//persona[@id='{subject}']")
+        persona_text = persona_node.text.strip() if persona_node is not None else "You are ALIN1."
+
+        return f"<poml version='1.0'>\n<system>\n<persona>{persona_text}</persona>\n{directives}\n</system>\n</poml>"
+    except Exception as e:
+        print(f"POML Error: {e}")
+        return "You are ALIN1, a specialized AI Tutor. strictly use textbook material only."
+
+# --- 📖 RETRIEVAL LOGIC ---
 def retrieve_book_rag(query: str, subject: str, n_results=3):
-    print(f"\n🔍 DEBUG: Searching '{subject}' DB for: '{query}'")
     collection = get_subject_collection(subject)
     if not collection or collection.count() == 0:
         return []
@@ -653,43 +1016,42 @@ def retrieve_book_rag(query: str, subject: str, n_results=3):
     relevant = []
     if results['documents'] and results['documents'][0]:
         for i in range(len(results['documents'][0])):
-            dist = results['distances'][0][i]
-            
-            # --- 💡 LOOSENED FILTER: 0.80 -> 0.85 ---
-            # This allows more "specific" matches (like names) to pass through.
-            if dist < 0.85: 
+            if results['distances'][0][i] < 0.85: # Tuned distance threshold
                 relevant.append({
                     "text": results['documents'][0][i],
                     "id": results['metadatas'][0][i].get("chunk_id", "Unknown"),
-                    "topic": results['metadatas'][0][i].get("topic", "Reference"),
-                    "score": dist
+                    "topic": results['metadatas'][0][i].get("topic", "Reference")
                 })
     return relevant
 
-# 4. CONTEXT BUILDING (The "Never Lose Context" Engine)
+# --- 🧠 CONTEXT ENGINE ---
 def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl"):
-    """
-    Combines Retrieval Augmented Generation with real-time Chat History.
-    chat_history expected format: [{"role": "user", "content": "..."}, {"role": "assistant", "content": "..."}]
-    """
-    # 1. Get Textbook Material
-    book_res = retrieve_book_rag(user_query, subject)
+    """Orchestrates Intent -> RAG (if needed) -> POML System Prompt."""
     
+    # 1. Classify Intent
+    intent = classify_intent(user_query)
+    
+    # 2. Conditional Retrieval (Save time if just chatting)
+    book_res = []
+    if intent == "KNOWLEDGE":
+        # Query Enhancer: Fix acronym casing for the Vector DB
+        search_query = user_query.replace("cfsr", "CFSR").replace("rtl", "RTL")
+        book_res = retrieve_book_rag(search_query, subject)
+    
+    # 3. Build context parts
     context_parts = []
-    
     if book_res:
         txt = "\n\n".join([f"[Source: {x['topic']}] {x['text']}" for x in book_res])
-        context_parts.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n" + txt)
+        context_parts.append(f"📖 {subject.upper()} TEXTBOOK MATERIAL:\n{txt}")
     
-    # 2. Format Chat History (Sliding Window: Last 5 turns)
+    # 4. Handle History (Last 5 turns)
     if chat_history:
-        history_text = ""
-        for turn in chat_history[-5:]: # Keep it light, keep it fast
-            role = "Student" if turn['role'] == 'user' else "ALIN1"
-            history_text += f"{role}: {turn['content']}\n"
-        
-        context_parts.append("💬 RECENT CONVERSATION LOG:\n" + history_text)
+        hist = "\n".join([f"{'Student' if t['role']=='user' else 'ALIN1'}: {t['content']}" for t in chat_history[-5:]])
+        context_parts.append(f"💬 RECENT CONVERSATION LOG:\n{hist}")
         
     final_context = "\n\n".join(context_parts) if context_parts else None
     
-    return final_context, book_res
+    # 5. Get the POML System Prompt
+    system_prompt = get_poml_prompt(subject)
+    
+    return system_prompt, final_context, book_res

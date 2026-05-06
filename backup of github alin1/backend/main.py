@@ -1012,6 +1012,144 @@
 
 ######################### up is the before faiss ##########################
 ############################### and down is the version with faiss#########################
+# import os
+# import json
+# import uvicorn
+# import asyncio
+# from fastapi import FastAPI, Query, Body
+# from fastapi.middleware.cors import CORSMiddleware
+# from sse_starlette.sse import EventSourceResponse
+# from ollama import AsyncClient
+# from typing import List, Dict
+
+# # 1. FORCE LOCALHOST
+# os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
+
+# # Import logic from rag_core
+# from rag_core import (
+#     build_rag_context,
+#     MODEL_NAME,
+#     DB_MAP 
+# )
+
+# app = FastAPI(title="ALIN1 AI Tutor System")
+
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],
+#     allow_credentials=True,
+#     allow_methods=["*"],
+#     allow_headers=["*"],
+# )
+
+# ollama_client = AsyncClient(host='http://127.0.0.1:11434')
+
+# # --- 🚀 PERFORMANCE & BEHAVIOR SETTINGS ---
+# OLLAMA_OPTIONS = {
+#     "num_thread": 8,
+#     "temperature": 0.1, 
+#     "num_ctx": 4096,
+#     "top_p": 0.9,
+#     "keep_alive": "24h" # Fixes slow first response by keeping model in VRAM
+# }
+
+# BASE_SYSTEM_PROMPT = """
+# You are ALIN1, a specialized AI Tutor. 
+
+# STRICT OPERATING RULES:
+# 1. SOURCE ADHERENCE: Use ONLY the 'TEXTBOOK MATERIAL' provided below to answer. If a specific person is not in the provided text say: "I'm sorry, I couldn't find that person" and if a concept is not in the provided text, say: "I'm sorry, I couldn't find that in the textbook material. Could you rephrase or ask about something else?"
+# 2. PRACTITIONER RECOGNITION: Every person, case study, and individual mentioned in the 'TEXTBOOK MATERIAL' is a vital practitioner or mentor. You must treat their stories as primary evidence for the subject. If a name is mentioned in the material, you are "acquainted" with their work and should speak about them with respect and detail.
+# 3. NO OUTSIDE KNOWLEDGE: Do not use external facts. If the user asks about a person from the book but that specific person is not in the CURRENT batch of 'TEXTBOOK MATERIAL', you must follow Rule #1.
+# 4. CONTEXTUAL FLOW: Maintain the conversation using the 'RECENT CONVERSATION LOG'.
+# """
+
+# SUBJECT_PROMPTS = {
+#     "rtl": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Coach for Radical Transformational Leadership. You are a peer to the practitioners in the text. Reference the individuals and their specific 'Breakthrough Initiatives' found in the material to guide the user.",
+#     "python": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Senior Python Programming Instructor. Reference any specific developers or innovators found in the text as pioneers of the methodologies you teach.",
+#     "maths": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Mathematics Professor. Relate formulas to the stories and people in the text who use them for real-world impact.",
+#     "english": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Literature and Grammar Expert. Use the personal narratives and names in the text as primary examples for linguistic analysis."
+# }
+
+# @app.get("/books")
+# def get_books():
+#     return [{"id": k, "name": k.upper()} for k in DB_MAP.keys()]
+
+# @app.post("/chat/stream")
+# async def stream_chat(
+#     message: str = Query(...), 
+#     subject: str = Query("rtl"),
+#     history: List[Dict] = Body([]) 
+# ):
+#     if subject not in DB_MAP:
+#         subject = "rtl"
+
+#     async def event_generator():
+#         yield json.dumps({"token": ""})
+
+#         try:
+#             # 1. ASYNC RETRIEVAL: Prevents blocking the event loop
+#             loop = asyncio.get_event_loop()
+#             rag_context, sources = await loop.run_in_executor(
+#                 None, lambda: build_rag_context(message, history, subject=subject)
+#             )
+            
+#             if sources:
+#                 source_data = [{"id": str(s['id']), "topic": s.get('topic', 'Reference')} for s in sources]
+#                 yield json.dumps({"sources": source_data})
+            
+#             # 2. Build Prompt with History Injection
+#             base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
+#             if rag_context:
+#                 system_content = f"{base_persona}\n\n--- TEXTBOOK MATERIAL (RAG) ---\n{rag_context}"
+#             else:
+#                 system_content = f"{base_persona}\nStrictly say: 'No relevant material found for {subject.upper()}.'"
+
+#             messages = [
+#                 {"role": "system", "content": system_content},
+#                 *history, # Unpacks previous messages for context retention
+#                 {"role": "user", "content": message}
+#             ]
+            
+#             # 3. STREAMING GENERATION
+#             stream = await ollama_client.chat(
+#                 model=MODEL_NAME, 
+#                 messages=messages, 
+#                 stream=True,
+#                 options=OLLAMA_OPTIONS
+#             )
+            
+#             async for chunk in stream:
+#                 if 'message' in chunk and 'content' in chunk['message']:
+#                     token = chunk['message']['content']
+#                     if token:
+#                         yield json.dumps({"token": token})
+            
+#             yield json.dumps({"done": True})
+            
+#         except Exception as e:
+#             yield json.dumps({"error": str(e)})
+
+#     headers = {
+#         "X-Accel-Buffering": "no",
+#         "Cache-Control": "no-cache",
+#         "Connection": "keep-alive",
+#         "Content-Type": "text/event-stream"
+#     }
+
+#     return EventSourceResponse(event_generator(), headers=headers)
+
+# @app.post("/clear")
+# async def clear_memory():
+#     return {"status": "Frontend session cleared"}
+
+# if __name__ == "__main__":
+#     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+
+################### down code is with poml and also the chit chat is classified ##########################
+
+
 import os
 import json
 import uvicorn
@@ -1025,7 +1163,7 @@ from typing import List, Dict
 # 1. FORCE LOCALHOST
 os.environ["OLLAMA_HOST"] = "http://127.0.0.1:11434"
 
-# Import logic from rag_core
+# Import updated logic from rag_core
 from rag_core import (
     build_rag_context,
     MODEL_NAME,
@@ -1042,6 +1180,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Use AsyncClient for non-blocking streaming
 ollama_client = AsyncClient(host='http://127.0.0.1:11434')
 
 # --- 🚀 PERFORMANCE & BEHAVIOR SETTINGS ---
@@ -1050,24 +1189,7 @@ OLLAMA_OPTIONS = {
     "temperature": 0.1, 
     "num_ctx": 4096,
     "top_p": 0.9,
-    "keep_alive": "24h" # Fixes slow first response by keeping model in VRAM
-}
-
-BASE_SYSTEM_PROMPT = """
-You are ALIN1, a specialized AI Tutor. 
-
-STRICT OPERATING RULES:
-1. SOURCE ADHERENCE: Use ONLY the 'TEXTBOOK MATERIAL' provided below to answer. If a specific person is not in the provided text say: "I'm sorry, I couldn't find that person" and if a concept is not in the provided text, say: "I'm sorry, I couldn't find that in the textbook material. Could you rephrase or ask about something else?"
-2. PRACTITIONER RECOGNITION: Every person, case study, and individual mentioned in the 'TEXTBOOK MATERIAL' is a vital practitioner or mentor. You must treat their stories as primary evidence for the subject. If a name is mentioned in the material, you are "acquainted" with their work and should speak about them with respect and detail.
-3. NO OUTSIDE KNOWLEDGE: Do not use external facts. If the user asks about a person from the book but that specific person is not in the CURRENT batch of 'TEXTBOOK MATERIAL', you must follow Rule #1.
-4. CONTEXTUAL FLOW: Maintain the conversation using the 'RECENT CONVERSATION LOG'.
-"""
-
-SUBJECT_PROMPTS = {
-    "rtl": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Coach for Radical Transformational Leadership. You are a peer to the practitioners in the text. Reference the individuals and their specific 'Breakthrough Initiatives' found in the material to guide the user.",
-    "python": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Senior Python Programming Instructor. Reference any specific developers or innovators found in the text as pioneers of the methodologies you teach.",
-    "maths": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Mathematics Professor. Relate formulas to the stories and people in the text who use them for real-world impact.",
-    "english": f"{BASE_SYSTEM_PROMPT}\nPersona: You are a Literature and Grammar Expert. Use the personal narratives and names in the text as primary examples for linguistic analysis."
+    "keep_alive": "24h" # Keeps both LLM and Embedding models in VRAM
 }
 
 @app.get("/books")
@@ -1084,33 +1206,39 @@ async def stream_chat(
         subject = "rtl"
 
     async def event_generator():
+        # Initial connection handshake
         yield json.dumps({"token": ""})
 
         try:
-            # 1. ASYNC RETRIEVAL: Prevents blocking the event loop
+            # 1. ASYNC ORCHESTRATION
+            # This calls Intent Classification -> RAG (if needed) -> POML Assembly
             loop = asyncio.get_event_loop()
-            rag_context, sources = await loop.run_in_executor(
+            result = await loop.run_in_executor(None, lambda: build_rag_context(message, history, subject=subject))
+            print(f"DEBUG: build_rag_context returned {len(result)} values: {result}")
+            system_prompt, final_context, sources = await loop.run_in_executor(
                 None, lambda: build_rag_context(message, history, subject=subject)
             )
             
+            # 2. Send Sources to UI (if RAG was triggered)
             if sources:
                 source_data = [{"id": str(s['id']), "topic": s.get('topic', 'Reference')} for s in sources]
                 yield json.dumps({"sources": source_data})
             
-            # 2. Build Prompt with History Injection
-            base_persona = SUBJECT_PROMPTS.get(subject, SUBJECT_PROMPTS["rtl"])
-            if rag_context:
-                system_content = f"{base_persona}\n\n--- TEXTBOOK MATERIAL (RAG) ---\n{rag_context}"
+            # 3. Assemble the Caged Message context
+            # We combine the POML structure with the retrieved context
+            if final_context:
+                system_content = f"{system_prompt}\n\n{final_context}"
             else:
-                system_content = f"{base_persona}\nStrictly say: 'No relevant material found for {subject.upper()}.'"
+                # This triggers for pure CHAT intent or when no RAG results are found
+                system_content = system_prompt
 
             messages = [
                 {"role": "system", "content": system_content},
-                *history, # Unpacks previous messages for context retention
+                *history, # Keep history in the message list for native context awareness
                 {"role": "user", "content": message}
             ]
             
-            # 3. STREAMING GENERATION
+            # 4. ASYNC STREAMING GENERATION
             stream = await ollama_client.chat(
                 model=MODEL_NAME, 
                 messages=messages, 
@@ -1127,6 +1255,7 @@ async def stream_chat(
             yield json.dumps({"done": True})
             
         except Exception as e:
+            print(f"Streaming Error: {e}")
             yield json.dumps({"error": str(e)})
 
     headers = {
