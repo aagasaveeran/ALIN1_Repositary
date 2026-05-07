@@ -1277,6 +1277,8 @@
 
 
 ######## down code is with killer switch #######
+
+
 import os
 import json
 import uvicorn
@@ -1340,29 +1342,42 @@ async def stream_chat(
 
         try:
             # 1. ASYNC ORCHESTRATION
-            # This calls Intent Classification -> RAG (if needed) -> POML Assembly
             loop = asyncio.get_event_loop()
             
-            # Cleaned up redundant double-call to build_rag_context for faster processing
-            system_prompt, final_context, sources = await loop.run_in_executor(
+            # Catch the new 'is_faq' variable!
+            system_prompt, final_context, sources, is_faq = await loop.run_in_executor(
                 None, lambda: build_rag_context(message, history, subject=subject)
             )
             
-            # 2. Send Sources to UI (if RAG was triggered)
+            # 2. Send Sources to UI
             if sources:
                 source_data = [{"id": str(s['id']), "topic": s.get('topic', 'Reference')} for s in sources]
                 yield json.dumps({"sources": source_data})
-            
+
+            # --- ⚡ THE LLM SHORT-CIRCUIT ---
+            if is_faq and sources:
+                print("\n⚡ SHORT-CIRCUITING OLLAMA: Streaming direct textbook answer to save CPU.")
+                direct_answer = "\n\n".join([s['text'] for s in sources])
+                
+                # Fake a fast streaming effect so it still looks like an AI typing
+                words = direct_answer.split(" ")
+                for i in range(0, len(words), 3):
+                    if await request.is_disconnected():
+                        break
+                    chunk = " ".join(words[i:i+3]) + " "
+                    yield json.dumps({"token": chunk})
+                    await asyncio.sleep(0.01) # Instant typing effect
+                
+                yield json.dumps({"done": True})
+                return # <-- EXIT FUNCTION IMMEDIATELY! Ollama is never called.
+
             # 3. Assemble the Caged Message context
-            # We combine the POML structure with the retrieved context
             if final_context:
                 system_content = f"{system_prompt}\n\n{final_context}"
             else:
-                # This triggers for pure CHAT intent or when no RAG results are found
                 system_content = system_prompt
 
-            # --- THE FIX: SANITIZE ANGULAR HISTORY ---
-            # Strip out timestamps, thinkTime, and sources. Ollama ONLY wants role and content.
+            # --- SANITIZE ANGULAR HISTORY ---
             clean_history = []
             for msg in history:
                 if "role" in msg and "content" in msg and msg["content"].strip():
@@ -1373,7 +1388,7 @@ async def stream_chat(
 
             messages = [
                 {"role": "system", "content": system_content},
-                *clean_history, # Use the sanitized history here
+                *clean_history, 
                 {"role": "user", "content": message}
             ]
             
@@ -1386,17 +1401,16 @@ async def stream_chat(
             )
             
             async for chunk in stream:
-                # 🛑 THE KILL SWITCH: Check if Angular dropped the connection
+                # 🛑 THE KILL SWITCH
                 if await request.is_disconnected():
                     print("\n🛑 CLIENT DISCONNECTED: Halting Ollama inference immediately to save compute.")
-                    break # Breaking this loop safely kills the local AI generation!
+                    break 
 
                 if 'message' in chunk and 'content' in chunk['message']:
                     token = chunk['message']['content']
                     if token:
                         yield json.dumps({"token": token})
                 
-                # Yield control back to the event loop so FastAPI can check disconnect status
                 await asyncio.sleep(0.001)
             
             yield json.dumps({"done": True})

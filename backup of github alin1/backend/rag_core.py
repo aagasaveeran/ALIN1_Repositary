@@ -1236,12 +1236,15 @@ def retrieve_book_rag(query: str, subject: str, n_results=3):
     return relevant
 
 # --- 🧠 CONTEXT ENGINE ---
+# --- 🧠 CONTEXT ENGINE ---
 def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl"):
     """Orchestrates Intent -> RAG (if needed) -> POML System Prompt."""
     
     # 1. Classify Intent
     intent = classify_intent(user_query)
     clean_query = user_query.lower().strip().strip('?!.')
+    
+    is_faq = False # <-- NEW FLAG
     
     # 2. Conditional Retrieval (Save time if just chatting)
     book_res = []
@@ -1251,10 +1254,10 @@ def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl")
         if clean_query in FAQ_CACHE:
             print(f"⚡ FAQ BYPASS ACTIVATED FOR: '{clean_query}'")
             book_res = retrieve_faq_direct(FAQ_CACHE[clean_query], subject)
-        
+            is_faq = True # <-- SET THE FLAG TO TRUE
+            
         # --- STANDARD VECTOR SEARCH ---
         else:
-            # Query Enhancer: Fix acronym casing for the Vector DB
             search_query = user_query.replace("cfsr", "CFSR").replace("rtl", "RTL")
             book_res = retrieve_book_rag(search_query, subject)
     
@@ -1274,4 +1277,5 @@ def build_rag_context(user_query: str, chat_history: list, subject: str = "rtl")
     # 5. Get the POML System Prompt
     system_prompt = get_poml_prompt(subject)
     
-    return system_prompt, final_context, book_res
+    # <-- RETURN 4 VARIABLES INSTEAD OF 3 -->
+    return system_prompt, final_context, book_res, is_faq
